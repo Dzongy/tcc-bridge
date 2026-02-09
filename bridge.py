@@ -7,11 +7,43 @@ Auth: X-Auth header token
 import subprocess
 import json
 import os
+import sys
 import base64
+import socket
+import signal
+import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 AUTH_TOKEN = "amos-bridge-2026"
 PORT = 8080
+LOG_FILE = os.path.expanduser("~/bridge.log")
+
+# --- Logging setup (file + stderr, unbuffered) ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stderr),
+    ],
+)
+log = logging.getLogger("bridge")
+
+
+def kill_port(port):
+    """Kill any process holding the port. Works without root on Termux."""
+    try:
+        r = subprocess.run(
+            f"lsof -ti:{port}", shell=True, capture_output=True, text=True
+        )
+        pids = r.stdout.strip().split()
+        for pid in pids:
+            if pid:
+                os.kill(int(pid), signal.SIGTERM)
+                log.info("Killed stale process %s on port %d", pid, port)
+    except Exception:
+        pass  # lsof may not exist; we handle bind failure below
+
 
 class BridgeHandler(BaseHTTPRequestHandler):
     def _auth(self):
@@ -35,7 +67,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._respond(200, {"status": "ok", "version": "2.0"})
+            self._respond(200, {"status": "ok", "version": "2.1"})
             return
         self._respond(404, {"error": "not found"})
 
@@ -48,16 +80,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(400, {"error": f"bad request: {e}"})
             return
 
-        if self.path == "/exec":
-            self._handle_exec(body)
-        elif self.path == "/toast":
-            self._handle_toast(body)
-        elif self.path == "/speak":
-            self._handle_speak(body)
-        elif self.path == "/vibrate":
-            self._handle_vibrate(body)
-        elif self.path == "/write_file":
-            self._handle_write_file(body)
+        routes = {
+            "/exec": self._handle_exec,
+            "/toast": self._handle_toast,
+            "/speak": self._handle_speak,
+            "/vibrate": self._handle_vibrate,
+            "/write_file": self._handle_write_file,
+        }
+        handler = routes.get(self.path)
+        if handler:
+            handler(body)
         else:
             self._respond(404, {"error": "not found"})
 
@@ -119,14 +151,39 @@ class BridgeHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._respond(500, {"error": str(e)})
 
-    def log_message(self, format, *args):
-        pass
+    def log_message(self, fmt, *args):
+        log.info("%s %s", self.client_address[0], fmt % args)
+
 
 if __name__ == "__main__":
-    print(f"AMOS Bridge v2 starting on port {PORT}...")
-    server = HTTPServer(("0.0.0.0", PORT), BridgeHandler)
     try:
+        # Kill anything squatting on our port
+        kill_port(PORT)
+
+        # SO_REUSEADDR: let the OS rebind immediately
+        class ReusableHTTPServer(HTTPServer):
+            allow_reuse_address = True
+            # Also allow reuse on Linux/Termux
+            def server_bind(self):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                super().server_bind()
+
+        server = ReusableHTTPServer(("0.0.0.0", PORT), BridgeHandler)
+        log.info("AMOS Bridge v2.1 listening on 0.0.0.0:%d", PORT)
+        print(f"AMOS Bridge v2.1 listening on 0.0.0.0:{PORT}", flush=True)
         server.serve_forever()
+
+    except OSError as e:
+        log.error("FATAL: Cannot bind port %d -- %s", PORT, e)
+        print(f"FATAL: Cannot bind port {PORT} -- {e}", file=sys.stderr, flush=True)
+        sys.exit(1)
+
     except KeyboardInterrupt:
-        print("Bridge shutting down.")
+        log.info("Bridge shutting down.")
+        print("Bridge shutting down.", flush=True)
         server.server_close()
+
+    except Exception as e:
+        log.error("FATAL: Unexpected error -- %s", e, exc_info=True)
+        print(f"FATAL: {e}", file=sys.stderr, flush=True)
+        sys.exit(1)
