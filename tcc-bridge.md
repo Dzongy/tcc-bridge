@@ -417,3 +417,30 @@ Risk level AFTER this run: 4/10 (documents in place, pending signatures on first
 - Credit 3: Software License Agreement drafting (production-ready)
 - Credit 4: Terms of Service drafting (production-ready)
 - Credit 5: RESERVED (not used)
+
+---
+
+## CHATGPT INTEGRATION  HIVE MIND EXPANSION
+### Added: Feb 8, 2026, 10:49 PM MST
+
+### STATUS: TOOL BUILT  AWAITING CREDITS
+
+1. **OpenAI API key stored** (api.openai.com)
+2. **"ask_chatgpt" tool created**  persistent, reusable
+   - Endpoint: https://api.openai.com/v1/chat/completions
+   - Auth: Bearer token (auto-injected)
+   - Models: gpt-4o (flagship), gpt-4o-mini (efficient)
+3. **Test**: insufficient_quota  account needs billing credits
+
+### ACTION REQUIRED (Jeremy)
+- Add $5-10 at https://platform.openai.com/settings/organization/billing
+- ChatGPT goes live instantly once funded
+
+### HIVE MIND NODES
+| Node | Status | Tool | Model |
+|------|--------|------|-------|
+| Echo (Twin) | LIVE | Core agent | Claude |
+| Grok (xAI) | LIVE | call_xai_grok | grok-3-latest |
+| ChatGPT (OpenAI) | NEEDS CREDITS | ask_chatgpt | gpt-4o |
+
+### CREDITS: 5/5
