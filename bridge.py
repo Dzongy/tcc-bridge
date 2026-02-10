@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v2 - Phone Control HTTP Server
+"""AMOS Bridge v2.2 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
-Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /health
+Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /health
 Auth: X-Auth header token
 """
 import subprocess
@@ -12,6 +12,7 @@ import base64
 import socket
 import signal
 import logging
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 AUTH_TOKEN = "amos-bridge-2026"
@@ -86,6 +87,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/speak": self._handle_speak,
             "/vibrate": self._handle_vibrate,
             "/write_file": self._handle_write_file,
+            "/listen": self._handle_listen,
         }
         handler = routes.get(self.path)
         if handler:
@@ -150,6 +152,79 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(200, {"ok": True, "path": path})
         except Exception as e:
             self._respond(500, {"error": str(e)})
+
+
+    def _handle_listen(self, body):
+        """Record audio and transcribe via on-device STT.
+        
+        Params:
+            seconds: recording duration (default 5, max 30)
+            mode: "stt" (default) uses termux-speech-to-text,
+                  "record" returns base64 audio for external STT
+        """
+        seconds = min(body.get("seconds", 5), 30)
+        mode = body.get("mode", "stt")
+        
+        if mode == "stt":
+            # Use termux-speech-to-text (Google on-device, blocks until speech ends)
+            log.info("Listening for speech (timeout %ds)...", seconds)
+            code, stdout, stderr = self._run(
+                f"timeout {seconds + 5} termux-speech-to-text",
+                timeout=seconds + 10
+            )
+            if code == 0 and stdout:
+                log.info("Heard: %s", stdout[:100])
+                self._respond(200, {"text": stdout, "mode": "stt"})
+            else:
+                self._respond(200, {
+                    "text": "",
+                    "error": stderr or "no speech detected",
+                    "mode": "stt",
+                    "returncode": code
+                })
+        
+        elif mode == "record":
+            # Record audio, base64 encode, return for external STT
+            audio_file = os.path.expanduser("~/ears_recording.wav")
+            
+            # Clean up any previous recording
+            self._run(f"rm -f {audio_file}")
+            
+            # Record audio
+            log.info("Recording %ds of audio...", seconds)
+            rec_code, _, rec_err = self._run(
+                f"termux-microphone-record -f {audio_file} -l {seconds} -e amr_wb",
+                timeout=seconds + 5
+            )
+            
+            # Wait for recording to finish
+            time.sleep(seconds + 1)
+            
+            # Stop recording explicitly
+            self._run("termux-microphone-record -q", timeout=5)
+            
+            # Check file exists and encode
+            if os.path.exists(audio_file):
+                with open(audio_file, "rb") as f:
+                    audio_b64 = base64.b64encode(f.read()).decode()
+                file_size = os.path.getsize(audio_file)
+                log.info("Recorded %d bytes of audio", file_size)
+                self._respond(200, {
+                    "audio_base64": audio_b64,
+                    "file_size": file_size,
+                    "format": "amr_wb",
+                    "seconds": seconds,
+                    "mode": "record"
+                })
+            else:
+                self._respond(500, {
+                    "error": "recording failed",
+                    "stderr": rec_err,
+                    "mode": "record"
+                })
+        
+        else:
+            self._respond(400, {"error": f"unknown mode: {mode}, use 'stt' or 'record'"})
 
     def log_message(self, fmt, *args):
         log.info("%s %s", self.client_address[0], fmt % args)
