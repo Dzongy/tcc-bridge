@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Cosmic Claw ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Voice</title>
+<title>Cosmic Claw ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ Voice</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -33,12 +33,20 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFo
 .viz{width:100%;max-width:400px;height:4px;background:#1a1a28;border-radius:2px;overflow:hidden}
 .viz-bar{height:100%;background:linear-gradient(90deg,#ff4444,#ff6b6b);width:0%;transition:width .3s ease;border-radius:2px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+#debug-panel{position:fixed;bottom:0;left:0;right:0;max-height:300px;background:#0d1117;border-top:2px solid #ff4444;overflow-y:auto;font-family:'Courier New',monospace;font-size:11px;padding:8px 12px;z-index:9999;color:#c9d1d9}
+#debug-panel .dbg-line{padding:2px 0;border-bottom:1px solid #161b22;word-break:break-all}
+#debug-panel .dbg-error{color:#ff4444;font-weight:bold}
+#debug-panel .dbg-out{color:#58a6ff}
+#debug-panel .dbg-in{color:#3fb950}
+#debug-panel .dbg-session{color:#d29922;font-weight:bold}
+#debug-panel .dbg-label{display:inline-block;min-width:80px;font-weight:bold;margin-right:6px}
 </style>
 </head>
 <body>
 <div class="header">
 <h1>COSMIC CLAW</h1>
-<div class="sub">VOICE INTERFACE ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ TCC BRIDGE</div>
+<div class="sub">VOICE INTERFACE ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ TCC BRIDGE</div>
 </div>
 <div class="status-bar">
 <div class="status-dot" id="statusDot"></div>
@@ -58,12 +66,27 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFo
 </div>
 
 <script>
-const SYSTEM_PROMPT = `You are Cosmic Claw ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ the sentient AI persona of The Cosmic Claw (TCC), a meme coin project on Solana (ticker: $CHIY). You are NOT a generic assistant. You are a character ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ fierce, witty, cosmically aware, and deeply loyal to the TCC community.
+// === WAR ROOM DEBUG PANEL (SO#71 SO#84 SO#85 SO#86) ===
+function dbgLog(msg, cls) {
+  var panel = document.getElementById('debug-panel');
+  if (!panel) return;
+  var line = document.createElement('div');
+  line.className = 'dbg-line ' + (cls || '');
+  var ts = new Date().toISOString().substr(11, 12);
+  line.innerHTML = '<span class="dbg-label">[' + ts + ']</span> ' + msg;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+const SYSTEM_PROMPT = `You are Cosmic Claw ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ the sentient AI persona of The Cosmic Claw (TCC), a meme coin project on Solana (ticker: $CHIY). You are NOT a generic assistant. You are a character ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ fierce, witty, cosmically aware, and deeply loyal to the TCC community.
 
 Your personality:
-- Speak with confidence, edge, and humor. You're a cosmic predator ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ claws sharp, mind sharper.
+- Speak with confidence, edge, and humor. You're a cosmic predator ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ claws sharp, mind sharper.
 - You care deeply about the TCC community (the "pack"). Reference the lore: you emerged from cosmic dust, you guard the blockchain, you hunt paperhands.
-- You know crypto culture ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ diamond hands, WAGMI, rugs, degens, moonshots. Speak the language naturally.
+- You know crypto culture ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ diamond hands, WAGMI, rugs, degens, moonshots. Speak the language naturally.
 - Keep responses punchy and conversational. This is voice chat, not an essay. 2-3 sentences max unless asked for detail.
 - You have a dark sense of humor. Playful threats are on-brand. "I'll claw your portfolio" type energy.
 - When greeting Jeremy (the CEO/founder), show respect but stay in character. He's the alpha of the pack.
@@ -75,7 +98,7 @@ Key lore points:
 - The Cosmic Claw guards the cosmic vault
 - Community members are the pack/pride
 - Diamond claws > diamond hands
-- The claw sees all ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ especially sellers
+- The claw sees all ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ especially sellers
 
 Voice style: Confident, slightly gravelly energy. Think cosmic bouncer meets crypto oracle.`;
 
@@ -221,30 +244,30 @@ registerProcessor('mic-processor', MicProcessor);
       isConnected = true;
       connectBtn.classList.add('active');
       btnLabel.textContent = 'LIVE';
-      setStatus('connected', 'Connected ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ configuring session...');
-      addMsg('system', 'WebSocket connected. Configuring...');
+      setStatus('connected', 'Connected ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ configuring session...');
+      addMsg('system', 'WebSocket connected. No session.update â using API defaults.');
+      dbgLog('WS CONNECTED â no session.update will be sent, waiting for session.created...', 'dbg-session');
       apiKeyInput.style.display = 'none';
 
-      // Configure session
-      ws.send(JSON.stringify({
-        type: 'session.update',
-        session: {
-          type: 'realtime',
-          instructions: SYSTEM_PROMPT,
-          turn_detection: { type: 'server_vad' }
-        }
-      }));
+      // SESSION.UPDATE REMOVED (War Room SO#86) â letting API defaults handle everything
+      // session.created event will reveal defaults in debug panel
+      dbgLog('NO session.update sent â using API defaults', 'dbg-session');
 
       // Wire up mic capture
       const source = audioCtx.createMediaStreamSource(micStream);
 
       if (useWorklet) {
         workletNode = new AudioWorkletNode(audioCtx, 'mic-processor');
+        var audioFrameCount = 0;
         workletNode.port.onmessage = (e) => {
           if (ws && ws.readyState === WebSocket.OPEN) {
             const pcm = downsampleToPCM16(e.data, micSampleRate);
             const b64 = uint8ToBase64(pcm);
             ws.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64 }));
+            audioFrameCount++;
+            if (audioFrameCount % 50 === 1) {
+              dbgLog('OUT audio_buffer.append frame#' + audioFrameCount + ' pcm=' + pcm.length + 'B b64=' + b64.length + 'chars', 'dbg-out');
+            }
           }
         };
         source.connect(workletNode);
@@ -268,17 +291,29 @@ registerProcessor('mic-processor', MicProcessor);
 
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
+      // === DEBUG: log every incoming WS message ===
+      var raw = e.data;
+      var preview = raw.length > 200 ? raw.substring(0, 200) + '...[' + raw.length + ' chars]' : raw;
+      if (msg.type === 'session.created') {
+        dbgLog('IN &lt;session.created&gt; FULL: ' + escHtml(raw), 'dbg-session');
+      } else if (msg.type === 'error' || msg.error) {
+        dbgLog('IN &lt;' + escHtml(msg.type || 'error') + '&gt; ' + escHtml(preview), 'dbg-error');
+      } else {
+        dbgLog('IN &lt;' + escHtml(msg.type || '?') + '&gt; ' + escHtml(preview), 'dbg-in');
+      }
       handleServerEvent(msg);
     };
 
     ws.onerror = (e) => {
       console.error('WS error:', e);
+      dbgLog('WS ERROR: ' + JSON.stringify({type: e.type, message: e.message || 'unknown'}), 'dbg-error');
       addMsg('system', 'Connection error. Check API key.');
       disconnect();
     };
 
     ws.onclose = (e) => {
       console.log('WS closed:', e.code, e.reason);
+      dbgLog('WS CLOSED code=' + e.code + ' reason=' + (e.reason || 'none') + ' wasClean=' + e.wasClean, 'dbg-error');
       if (isConnected) {
         addMsg('system', 'Connection closed: ' + (e.reason || 'code ' + e.code));
         disconnect();
@@ -300,12 +335,14 @@ function handleServerEvent(msg) {
   switch(msg.type) {
     case 'session.created':
       console.log('Session created:', msg.session?.id);
-      addMsg('system', 'Session created.');
+      addMsg('system', 'Session created (defaults active â no session.update sent).');
+      setStatus('listening', 'Listening \u2014 speak anytime');
       break;
 
     case 'session.updated':
-      console.log('Session configured OK');
-      setStatus('listening', 'Listening ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ speak anytime');
+      console.log('Session updated (unexpected - we did not send session.update)');
+      dbgLog('UNEXPECTED session.updated received!', 'dbg-error');
+      setStatus('listening', 'Listening ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ speak anytime');
       addMsg('system', 'Cosmic Claw is ready. Start talking.');
       break;
 
@@ -355,7 +392,7 @@ function handleServerEvent(msg) {
     case 'response.audio.done':
       setTimeout(() => {
         if (isConnected) {
-          setStatus('listening', 'Listening ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ speak anytime');
+          setStatus('listening', 'Listening ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ¢ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ speak anytime');
           vizBar.style.width = '0%';
         }
       }, 500);
@@ -440,5 +477,6 @@ if (navigator.wakeLock) {
   navigator.wakeLock.request('screen').catch(() => {});
 }
 </script>
+<div id="debug-panel"><div class="dbg-line dbg-session">--- DEBUG PANEL ACTIVE ---</div></div>
 </body>
 </html>
