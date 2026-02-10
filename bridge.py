@@ -364,7 +364,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 timeout=5
             )
             if rec_code != 0:
-                log.warning("Mic failed in conversation round %d: %s", i + 1, rec_err)
+                log.warning("Mic failed in conversation round %d: %s", round_num, rec_err)
                 self._speak_sync("Microphone error. Ending conversation.")
                 transcript.append({"role": "system", "content": f"mic_error: {rec_err}"})
                 break
@@ -378,7 +378,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             file_size = int(stat_out) if stat_out.isdigit() else 0
             
             if file_size < 100:
-                log.info("Empty audio in round %d, retrying", i + 1)
+                log.info("Empty audio in round %d, retrying", round_num)
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": "no_speech_retry"})
                 continue
@@ -394,7 +394,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             w_code, w_out, w_err = self._run(whisper_cmd, timeout=30)
             
             if w_code != 0:
-                log.warning("Whisper failed in round %d: %s", i + 1, w_err)
+                log.warning("Whisper failed in round %d: %s", round_num, w_err)
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": f"whisper_error: {w_err}"})
                 continue
@@ -403,13 +403,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 whisper_resp = json.loads(w_out)
                 user_text = whisper_resp.get("text", "").strip()
             except json.JSONDecodeError:
-                log.warning("Whisper parse error round %d: %s", i + 1, w_out[:200])
+                log.warning("Whisper parse error round %d: %s", round_num, w_out[:200])
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": "whisper_parse_error"})
                 continue
             
             if not user_text:
-                log.info("No speech detected round %d", i + 1)
+                log.info("No speech detected round %d", round_num)
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": "no_speech"})
                 continue
@@ -440,19 +440,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             c_code, c_out, c_err = self._run(chat_cmd, timeout=45)
             
             if c_code != 0:
-                log.warning("GPT call failed round %d: %s", i + 1, c_err)
+                log.warning("GPT call failed round %d: %s", round_num, c_err)
                 transcript.append({"role": "system", "content": f"gpt_error: {c_err}"})
                 break
             
             try:
                 chat_resp = json.loads(c_out)
                 if "error" in chat_resp:
-                    log.warning("GPT API error round %d: %s", i + 1, chat_resp["error"])
+                    log.warning("GPT API error round %d: %s", round_num, chat_resp["error"])
                     transcript.append({"role": "system", "content": f"gpt_api_error: {chat_resp['error']}"})
                     break
                 ai_text = chat_resp["choices"][0]["message"]["content"].strip()
             except (json.JSONDecodeError, KeyError, IndexError) as e:
-                log.warning("GPT parse error round %d: %s", i + 1, str(e))
+                log.warning("GPT parse error round %d: %s", round_num, str(e))
                 transcript.append({"role": "system", "content": f"gpt_parse_error: {c_out[:200]}"})
                 break
             
@@ -495,8 +495,8 @@ if __name__ == "__main__":
                 super().server_bind()
 
         server = ReusableHTTPServer(("0.0.0.0", PORT), BridgeHandler)
-        log.info("AMOS Bridge v3.3 listening on 0.0.0.0:%d", PORT)
-        print(f"AMOS Bridge v3.3 listening on 0.0.0.0:{PORT}", flush=True)
+        log.info("AMOS Bridge v4.0 listening on 0.0.0.0:%d", PORT)
+        print(f"AMOS Bridge v4.0 listening on 0.0.0.0:{PORT}", flush=True)
         server.serve_forever()
 
     except OSError as e:
