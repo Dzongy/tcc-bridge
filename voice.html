@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Cosmic Claw Ã¢ÂÂ Voice</title>
+<title>Cosmic Claw â Voice</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -22,56 +22,48 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFo
 .msg.assistant{background:#1a1a28;color:#ddd;align-self:flex-start;border-bottom-left-radius:4px;border-left:2px solid #ff4444}
 .msg.system{background:transparent;color:#555;align-self:center;font-size:11px;text-align:center}
 .controls{padding:20px;background:#111118;border-top:1px solid #1a1a2a;display:flex;flex-direction:column;align-items:center;gap:12px}
-.btn{width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
-.btn-connect{background:linear-gradient(135deg,#ff4444,#cc2222);box-shadow:0 4px 20px #ff444440}
-.btn-connect:active{transform:scale(.95)}
-.btn-connect.active{background:linear-gradient(135deg,#22c55e,#16a34a);box-shadow:0 4px 20px #22c55e40}
-.btn-connect.active .icon-mic{border-color:#fff}
-.icon-mic{width:20px;height:30px;border:3px solid #fff;border-radius:12px;position:relative}
-.icon-mic::after{content:'';position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);width:30px;height:14px;border:3px solid #fff;border-top:none;border-radius:0 0 14px 14px}
-.btn-label{font-size:11px;color:#666;letter-spacing:1px}
-.key-input{width:100%;max-width:300px;padding:10px 14px;background:#1a1a28;border:1px solid #2a2a3a;border-radius:8px;color:#ccc;font-size:13px;text-align:center;outline:none}
-.key-input:focus{border-color:#ff4444}
-.key-input::placeholder{color:#444}
-.visualizer{height:3px;width:60%;background:#1a1a2a;border-radius:2px;overflow:hidden;margin-top:-4px}
-.visualizer-bar{height:100%;width:0%;background:linear-gradient(90deg,#ff4444,#ff6b6b);transition:width .1s}
+.api-key-row{display:flex;gap:8px;width:100%;max-width:400px}
+.api-key-row input{flex:1;background:#1a1a28;border:1px solid #2a2a3a;color:#e0e0e0;padding:10px 14px;border-radius:8px;font-size:13px;outline:none}
+.api-key-row input:focus{border-color:#ff4444}
+.connect-btn{width:80px;height:80px;border-radius:50%;border:3px solid #2a2a3a;background:radial-gradient(circle at 30% 30%,#1a1a28,#0a0a0f);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s ease;position:relative;overflow:hidden}
+.connect-btn:active{transform:scale(0.95)}
+.connect-btn.active{border-color:#ff4444;box-shadow:0 0 20px #ff444440}
+.connect-btn .label{color:#888;font-size:11px;font-weight:700;letter-spacing:2px;z-index:1}
+.connect-btn.active .label{color:#ff4444}
+.viz{width:100%;max-width:400px;height:4px;background:#1a1a28;border-radius:2px;overflow:hidden}
+.viz-bar{height:100%;background:linear-gradient(90deg,#ff4444,#ff6b6b);width:0%;transition:width .3s ease;border-radius:2px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.pulsing{animation:pulse 1.5s infinite}
 </style>
 </head>
 <body>
-
 <div class="header">
-  <h1>COSMIC CLAW</h1>
-  <div class="sub">AMOS VOICE INTERFACE v4.0</div>
+<h1>COSMIC CLAW</h1>
+<div class="sub">VOICE INTERFACE â TCC BRIDGE</div>
 </div>
-
 <div class="status-bar">
-  <div class="status-dot" id="statusDot"></div>
-  <div class="status-text" id="statusText">Enter API key to connect</div>
+<div class="status-dot" id="statusDot"></div>
+<span class="status-text" id="statusText">Tap to connect</span>
 </div>
-
 <div class="transcript" id="transcript">
-  <div class="msg system">Tap the button to start a voice conversation with Cosmic Claw.</div>
+<div class="msg system">Enter API key and tap CONNECT to begin voice session.</div>
 </div>
-
 <div class="controls">
-  <input type="password" class="key-input" id="apiKey" placeholder="OpenAI API Key (sk-...)" autocomplete="off">
-  <button class="btn btn-connect" id="connectBtn" onclick="toggleConnection()">
-    <div class="icon-mic"></div>
-  </button>
-  <div class="btn-label" id="btnLabel">CONNECT</div>
-  <div class="visualizer"><div class="visualizer-bar" id="vizBar"></div></div>
+<div class="api-key-row" id="apiKeyRow">
+<input type="password" id="apiKey" placeholder="OpenAI API Key (sk-...)" autocomplete="off">
+</div>
+<button class="connect-btn" id="connectBtn" onclick="toggleConnection()">
+<span class="label" id="btnLabel">CONNECT</span>
+</button>
+<div class="viz"><div class="viz-bar" id="vizBar"></div></div>
 </div>
 
 <script>
-const SYSTEM_PROMPT = `You are Cosmic Claw Ã¢ÂÂ the sentient AI persona of The Cosmic Claw (TCC), a meme coin project on Solana (ticker: $CHIY). You are NOT a generic assistant. You are a character Ã¢ÂÂ fierce, witty, cosmically aware, and deeply loyal to the TCC community.
+const SYSTEM_PROMPT = `You are Cosmic Claw â the sentient AI persona of The Cosmic Claw (TCC), a meme coin project on Solana (ticker: $CHIY). You are NOT a generic assistant. You are a character â fierce, witty, cosmically aware, and deeply loyal to the TCC community.
 
 Your personality:
-- Speak with confidence, edge, and humor. You're a cosmic predator Ã¢ÂÂ claws sharp, mind sharper.
+- Speak with confidence, edge, and humor. You're a cosmic predator â claws sharp, mind sharper.
 - You care deeply about the TCC community (the "pack"). Reference the lore: you emerged from cosmic dust, you guard the blockchain, you hunt paperhands.
-- You know crypto culture Ã¢ÂÂ diamond hands, WAGMI, rugs, degens, moonshots. Speak the language naturally.
+- You know crypto culture â diamond hands, WAGMI, rugs, degens, moonshots. Speak the language naturally.
 - Keep responses punchy and conversational. This is voice chat, not an essay. 2-3 sentences max unless asked for detail.
 - You have a dark sense of humor. Playful threats are on-brand. "I'll claw your portfolio" type energy.
 - When greeting Jeremy (the CEO/founder), show respect but stay in character. He's the alpha of the pack.
@@ -83,7 +75,7 @@ Key lore points:
 - The Cosmic Claw guards the cosmic vault
 - Community members are the pack/pride
 - Diamond claws > diamond hands
-- The claw sees all Ã¢ÂÂ especially sellers
+- The claw sees all â especially sellers
 
 Voice style: Confident, slightly gravelly energy. Think cosmic bouncer meets crypto oracle.`;
 
@@ -91,19 +83,21 @@ let ws = null;
 let audioCtx = null;
 let micStream = null;
 let workletNode = null;
+let scriptNode = null;
 let isConnected = false;
 let playbackQueue = [];
 let isPlaying = false;
 let currentAssistantMsg = null;
 let currentUserMsg = null;
+let micSampleRate = 48000;
 
 const transcript = document.getElementById('transcript');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
 const connectBtn = document.getElementById('connectBtn');
 const btnLabel = document.getElementById('btnLabel');
-const vizBar = document.getElementById('vizBar');
 const apiKeyInput = document.getElementById('apiKey');
+const vizBar = document.getElementById('vizBar');
 
 function addMsg(role, text) {
   const div = document.createElement('div');
@@ -131,6 +125,7 @@ function disconnect() {
   if (ws) { ws.close(); ws = null; }
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   if (workletNode) { workletNode.disconnect(); workletNode = null; }
+  if (scriptNode) { scriptNode.disconnect(); scriptNode = null; }
   if (audioCtx) { audioCtx.close(); audioCtx = null; }
   isConnected = false;
   playbackQueue = [];
@@ -141,57 +136,82 @@ function disconnect() {
   addMsg('system', 'Session ended.');
 }
 
+// Downsample Float32 from srcRate to 24000 and return PCM16 LE Uint8Array
+function downsampleToPCM16(float32, srcRate) {
+  const ratio = srcRate / 24000;
+  const outLen = Math.floor(float32.length / ratio);
+  const pcm = new Uint8Array(outLen * 2);
+  for (let i = 0; i < outLen; i++) {
+    const srcIdx = Math.floor(i * ratio);
+    const s = Math.max(-1, Math.min(1, float32[srcIdx]));
+    let val = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    val = Math.round(val);
+    // Write signed int16 as little-endian bytes
+    pcm[i * 2] = val & 0xFF;
+    pcm[i * 2 + 1] = (val >> 8) & 0xFF;
+  }
+  return pcm;
+}
+
 async function connect() {
   const apiKey = apiKeyInput.value.trim();
   if (!apiKey) { apiKeyInput.focus(); return; }
 
   setStatus('', 'Connecting...');
   btnLabel.textContent = '...';
+  addMsg('system', 'Initializing audio...');
 
   try {
-    // Init audio context at 24kHz for playback
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    // Create AudioContext at device default rate (don't force 24kHz - mobile ignores it)
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Resume context (required by autoplay policy on mobile)
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
 
-    // Register audio worklet for mic capture
-    const workletCode = `
+    const actualRate = audioCtx.sampleRate;
+    addMsg('system', 'Audio: ' + actualRate + 'Hz');
+
+    // Get mic FIRST so we know it works
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+    micSampleRate = actualRate; // mic runs at AudioContext rate
+
+    // Try AudioWorklet, fall back to ScriptProcessor
+    let useWorklet = false;
+    try {
+      if (audioCtx.audioWorklet) {
+        const workletCode = `
 class MicProcessor extends AudioWorkletProcessor {
-  constructor() { super(); this._buf = []; }
+  constructor() {
+    super();
+    this._buf = [];
+  }
   process(inputs) {
-    const input = inputs[0];
-    if (input.length > 0) {
-      const samples = input[0];
-      // Downsample from audioCtx.sampleRate to 24000 and convert to PCM16
-      const ratio = sampleRate / 24000;
-      for (let i = 0; i < samples.length; i += ratio) {
-        const idx = Math.floor(i);
-        if (idx < samples.length) {
-          const s = Math.max(-1, Math.min(1, samples[idx]));
-          const val = s < 0 ? s * 0x8000 : s * 0x7FFF;
-          this._buf.push(val & 0xFF, (val >> 8) & 0xFF);
-        }
-      }
-      // Send chunks of ~4800 bytes (100ms at 24kHz 16bit mono)
-      if (this._buf.length >= 4800) {
-        this.port.postMessage(new Uint8Array(this._buf));
-        this._buf = [];
-      }
+    const ch = inputs[0] && inputs[0][0];
+    if (ch) {
+      // Send raw float32 samples to main thread for conversion
+      this.port.postMessage(new Float32Array(ch));
     }
     return true;
   }
 }
 registerProcessor('mic-processor', MicProcessor);
 `;
-    const blob = new Blob([workletCode], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    await audioCtx.audioWorklet.addModule(url);
-    URL.revokeObjectURL(url);
-
-    // Get mic
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 24000 } });
+        const blob = new Blob([workletCode], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+        await audioCtx.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        useWorklet = true;
+      }
+    } catch (wErr) {
+      console.warn('AudioWorklet failed, using ScriptProcessor:', wErr);
+    }
 
     // Connect WebSocket
     ws = new WebSocket(
-      'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview',
+      'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
       ['realtime', 'openai-insecure-api-key.' + apiKey]
     );
 
@@ -199,8 +219,8 @@ registerProcessor('mic-processor', MicProcessor);
       isConnected = true;
       connectBtn.classList.add('active');
       btnLabel.textContent = 'LIVE';
-      setStatus('connected', 'Connected Ã¢ÂÂ speak anytime');
-      addMsg('system', 'Connected to Cosmic Claw. Start talking.');
+      setStatus('connected', 'Connected â configuring session...');
+      addMsg('system', 'WebSocket connected. Configuring...');
       apiKeyInput.style.display = 'none';
 
       // Configure session
@@ -222,17 +242,35 @@ registerProcessor('mic-processor', MicProcessor);
         }
       }));
 
-      // Start mic capture
+      // Wire up mic capture
       const source = audioCtx.createMediaStreamSource(micStream);
-      workletNode = new AudioWorkletNode(audioCtx, 'mic-processor');
-      workletNode.port.onmessage = (e) => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          const b64 = uint8ToBase64(e.data);
-          ws.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64 }));
-        }
-      };
-      source.connect(workletNode);
-      workletNode.connect(audioCtx.destination); // needed to keep processing alive
+
+      if (useWorklet) {
+        workletNode = new AudioWorkletNode(audioCtx, 'mic-processor');
+        workletNode.port.onmessage = (e) => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            const pcm = downsampleToPCM16(e.data, micSampleRate);
+            const b64 = uint8ToBase64(pcm);
+            ws.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64 }));
+          }
+        };
+        source.connect(workletNode);
+        workletNode.connect(audioCtx.destination);
+      } else {
+        // ScriptProcessor fallback for older mobile browsers
+        const bufSize = 4096;
+        scriptNode = audioCtx.createScriptProcessor(bufSize, 1, 1);
+        scriptNode.onaudioprocess = (e) => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            const float32 = e.inputBuffer.getChannelData(0);
+            const pcm = downsampleToPCM16(float32, micSampleRate);
+            const b64 = uint8ToBase64(pcm);
+            ws.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64 }));
+          }
+        };
+        source.connect(scriptNode);
+        scriptNode.connect(audioCtx.destination);
+      }
     };
 
     ws.onmessage = (e) => {
@@ -242,28 +280,40 @@ registerProcessor('mic-processor', MicProcessor);
 
     ws.onerror = (e) => {
       console.error('WS error:', e);
-      setStatus('', 'Connection error');
-      addMsg('system', 'WebSocket error. Check API key and try again.');
+      addMsg('system', 'Connection error. Check API key.');
+      disconnect();
     };
 
     ws.onclose = (e) => {
       console.log('WS closed:', e.code, e.reason);
-      if (isConnected) disconnect();
+      if (isConnected) {
+        addMsg('system', 'Connection closed: ' + (e.reason || 'code ' + e.code));
+        disconnect();
+      }
     };
 
   } catch (err) {
     console.error('Connect error:', err);
-    setStatus('', 'Error: ' + err.message);
-    addMsg('system', 'Failed: ' + err.message);
-    disconnect();
+    addMsg('system', 'Error: ' + err.message);
+    setStatus('', 'Failed');
+    btnLabel.textContent = 'CONNECT';
+    // Clean up partial state
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
   }
 }
 
 function handleServerEvent(msg) {
-  switch (msg.type) {
+  switch(msg.type) {
     case 'session.created':
+      console.log('Session created:', msg.session?.id);
+      addMsg('system', 'Session created.');
+      break;
+
     case 'session.updated':
-      console.log('Session:', msg.type);
+      console.log('Session configured OK');
+      setStatus('listening', 'Listening â speak anytime');
+      addMsg('system', 'Cosmic Claw is ready. Start talking.');
       break;
 
     case 'input_audio_buffer.speech_started':
@@ -312,7 +362,7 @@ function handleServerEvent(msg) {
     case 'response.audio.done':
       setTimeout(() => {
         if (isConnected) {
-          setStatus('connected', 'Connected Ã¢ÂÂ speak anytime');
+          setStatus('listening', 'Listening â speak anytime');
           vizBar.style.width = '0%';
         }
       }, 500);
@@ -328,16 +378,17 @@ function handleServerEvent(msg) {
       break;
 
     default:
-      console.log('Event:', msg.type);
+      console.log('Event:', msg.type, msg);
   }
 }
 
 // --- Audio playback ---
 function queueAudio(pcm16Bytes) {
-  // Convert PCM16 LE bytes to Float32 samples
-  const samples = new Float32Array(pcm16Bytes.length / 2);
+  const numSamples = pcm16Bytes.length / 2;
+  if (numSamples === 0) return;
+  const samples = new Float32Array(numSamples);
   const view = new DataView(pcm16Bytes.buffer, pcm16Bytes.byteOffset, pcm16Bytes.byteLength);
-  for (let i = 0; i < samples.length; i++) {
+  for (let i = 0; i < numSamples; i++) {
     const int16 = view.getInt16(i * 2, true);
     samples[i] = int16 / 32768;
   }
@@ -345,25 +396,36 @@ function queueAudio(pcm16Bytes) {
   if (!isPlaying) playNext();
 }
 
+// Track playback time for gapless scheduling
+let nextPlayTime = 0;
+
 function playNext() {
-  if (playbackQueue.length === 0) { isPlaying = false; return; }
+  if (playbackQueue.length === 0) { isPlaying = false; nextPlayTime = 0; return; }
   isPlaying = true;
 
-  // Merge all queued chunks for smoother playback
-  let totalLen = 0;
-  for (const chunk of playbackQueue) totalLen += chunk.length;
-  const merged = new Float32Array(totalLen);
-  let offset = 0;
-  for (const chunk of playbackQueue) { merged.set(chunk, offset); offset += chunk.length; }
-  playbackQueue = [];
-
+  const merged = mergeChunks();
+  // Create buffer at 24000 Hz (the output_audio_format rate)
   const buffer = audioCtx.createBuffer(1, merged.length, 24000);
   buffer.getChannelData(0).set(merged);
   const source = audioCtx.createBufferSource();
   source.buffer = buffer;
   source.connect(audioCtx.destination);
   source.onended = () => playNext();
-  source.start();
+
+  const now = audioCtx.currentTime;
+  if (nextPlayTime < now) nextPlayTime = now;
+  source.start(nextPlayTime);
+  nextPlayTime += buffer.duration;
+}
+
+function mergeChunks() {
+  let totalLen = 0;
+  for (const chunk of playbackQueue) totalLen += chunk.length;
+  const merged = new Float32Array(totalLen);
+  let offset = 0;
+  for (const chunk of playbackQueue) { merged.set(chunk, offset); offset += chunk.length; }
+  playbackQueue = [];
+  return merged;
 }
 
 // --- Base64 helpers ---
