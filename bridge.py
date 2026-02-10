@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v2.4 - Phone Control HTTP Server
+"""AMOS Bridge v2.5 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
 Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /health
 Auth: X-Auth header token
@@ -189,6 +189,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         openai_key = body.get("openai_key", "") or os.environ.get("OPENAI_API_KEY", "")
         
         audio_file = os.path.expanduser("~/ears_recording.wav")
+        
+        # Kill any lingering TTS to release audio hardware
+        subprocess.run(['pkill', '-f', 'termux-tts-speak'], capture_output=True, timeout=3)
+        time.sleep(2)  # Wait for audio hardware release
         
         # Step 1: Clean up previous recording
         self._run(f"rm -f {audio_file}")
