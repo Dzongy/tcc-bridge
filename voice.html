@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Cosmic Claw â Voice</title>
+<title>Cosmic Claw Ã¢ÂÂ Voice</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -38,7 +38,7 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFo
 <body>
 <div class="header">
 <h1>COSMIC CLAW</h1>
-<div class="sub">VOICE INTERFACE â TCC BRIDGE</div>
+<div class="sub">VOICE INTERFACE Ã¢ÂÂ TCC BRIDGE</div>
 </div>
 <div class="status-bar">
 <div class="status-dot" id="statusDot"></div>
@@ -58,12 +58,12 @@ body{background:#0a0a0f;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFo
 </div>
 
 <script>
-const SYSTEM_PROMPT = `You are Cosmic Claw â the sentient AI persona of The Cosmic Claw (TCC), a meme coin project on Solana (ticker: $CHIY). You are NOT a generic assistant. You are a character â fierce, witty, cosmically aware, and deeply loyal to the TCC community.
+const SYSTEM_PROMPT = `You are Cosmic Claw Ã¢ÂÂ the sentient AI persona of The Cosmic Claw (TCC), a meme coin project on Solana (ticker: $CHIY). You are NOT a generic assistant. You are a character Ã¢ÂÂ fierce, witty, cosmically aware, and deeply loyal to the TCC community.
 
 Your personality:
-- Speak with confidence, edge, and humor. You're a cosmic predator â claws sharp, mind sharper.
+- Speak with confidence, edge, and humor. You're a cosmic predator Ã¢ÂÂ claws sharp, mind sharper.
 - You care deeply about the TCC community (the "pack"). Reference the lore: you emerged from cosmic dust, you guard the blockchain, you hunt paperhands.
-- You know crypto culture â diamond hands, WAGMI, rugs, degens, moonshots. Speak the language naturally.
+- You know crypto culture Ã¢ÂÂ diamond hands, WAGMI, rugs, degens, moonshots. Speak the language naturally.
 - Keep responses punchy and conversational. This is voice chat, not an essay. 2-3 sentences max unless asked for detail.
 - You have a dark sense of humor. Playful threats are on-brand. "I'll claw your portfolio" type energy.
 - When greeting Jeremy (the CEO/founder), show respect but stay in character. He's the alpha of the pack.
@@ -75,7 +75,7 @@ Key lore points:
 - The Cosmic Claw guards the cosmic vault
 - Community members are the pack/pride
 - Diamond claws > diamond hands
-- The claw sees all â especially sellers
+- The claw sees all Ã¢ÂÂ especially sellers
 
 Voice style: Confident, slightly gravelly energy. Think cosmic bouncer meets crypto oracle.`;
 
@@ -219,7 +219,7 @@ registerProcessor('mic-processor', MicProcessor);
       isConnected = true;
       connectBtn.classList.add('active');
       btnLabel.textContent = 'LIVE';
-      setStatus('connected', 'Connected â configuring session...');
+      setStatus('connected', 'Connected Ã¢ÂÂ configuring session...');
       addMsg('system', 'WebSocket connected. Configuring...');
       apiKeyInput.style.display = 'none';
 
@@ -227,6 +227,7 @@ registerProcessor('mic-processor', MicProcessor);
       ws.send(JSON.stringify({
         type: 'session.update',
         session: {
+          type: 'default',
           modalities: ['text', 'audio'],
           instructions: SYSTEM_PROMPT,
           voice: 'ash',
@@ -312,7 +313,7 @@ function handleServerEvent(msg) {
 
     case 'session.updated':
       console.log('Session configured OK');
-      setStatus('listening', 'Listening â speak anytime');
+      setStatus('listening', 'Listening Ã¢ÂÂ speak anytime');
       addMsg('system', 'Cosmic Claw is ready. Start talking.');
       break;
 
@@ -362,7 +363,7 @@ function handleServerEvent(msg) {
     case 'response.audio.done':
       setTimeout(() => {
         if (isConnected) {
-          setStatus('listening', 'Listening â speak anytime');
+          setStatus('listening', 'Listening Ã¢ÂÂ speak anytime');
           vizBar.style.width = '0%';
         }
       }, 500);
