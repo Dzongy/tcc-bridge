@@ -209,11 +209,12 @@ async function connect() {
       playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
       dbgLog('Playback AudioContext fell back to ' + playbackCtx.sampleRate + 'Hz', 'dbg-error');
     }
-    dbgLog('24kHz AudioContext failed, using default: ' + audioCtx.sampleRate + 'Hz', 'dbg-error');
-    }
-    // Resume context (required by autoplay policy on mobile)
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume(); if (playbackCtx) playbackCtx.resume();
+
+    // SO#88: Resume BOTH contexts unconditionally during user gesture (autoplay policy fix)
+    await audioCtx.resume();
+    if (playbackCtx) {
+      await playbackCtx.resume();
+      dbgLog('PLAYBACK: context state after resume = ' + playbackCtx.state, 'dbg-session');
     }
 
     const actualRate = audioCtx.sampleRate;
@@ -427,16 +428,27 @@ function handleServerEvent(msg) {
 
     case 'response.output_audio.delta':
       if (msg.delta) {
-        if (playbackCtx && playbackCtx.state === 'suspended') playbackCtx.resume();
+        // SO#88: Playback debug logging
+        dbgLog('PLAYBACK: context state = ' + (playbackCtx ? playbackCtx.state : 'NULL'), 'dbg-out');
+        if (playbackCtx && playbackCtx.state === 'suspended') {
+          playbackCtx.resume();
+          dbgLog('PLAYBACK: resumed suspended context', 'dbg-error');
+        }
         setStatus('speaking', 'Speaking...');
         vizBar.style.width = '80%';
-        const pcm = base64ToUint8(msg.delta);
-        queueAudio(pcm);
+        try {
+          const pcm = base64ToUint8(msg.delta);
+          const durationMs = Math.round((pcm.length / 2) / 24000 * 1000);
+          dbgLog('PLAYBACK: received ' + durationMs + 'ms of audio (' + pcm.length + ' bytes)', 'dbg-out');
+          queueAudio(pcm);
+        } catch (audioErr) {
+          dbgLog('PLAYBACK ERROR: ' + audioErr.message, 'dbg-error');
+        }
       }
       break;
 
     case 'response.output_audio.done':
-      dbgLog('Audio stream complete', 'dbg-out');
+      dbgLog('PLAYBACK: audio stream complete', 'dbg-out');
       break;
 
     case 'response.done':
@@ -477,19 +489,27 @@ function playNext() {
   if (playbackQueue.length === 0) { isPlaying = false; nextPlayTime = 0; return; }
   isPlaying = true;
 
-  const merged = mergeChunks();
-  // Create buffer at 24000 Hz (the output_audio_format rate)
-  const buffer = playbackCtx.createBuffer(1, merged.length, 24000);
-  buffer.getChannelData(0).set(merged);
-  const source = playbackCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(playbackCtx.destination);
-  source.onended = () => playNext();
+  try {
+    const merged = mergeChunks();
+    // Create buffer at 24000 Hz (the output_audio_format rate)
+    const buffer = playbackCtx.createBuffer(1, merged.length, 24000);
+    buffer.getChannelData(0).set(merged);
+    const source = playbackCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(playbackCtx.destination);
+    source.onended = () => playNext();
 
-  const now = playbackCtx.currentTime;
-  if (nextPlayTime < now) nextPlayTime = now;
-  source.start(nextPlayTime);
-  nextPlayTime += buffer.duration;
+    const now = playbackCtx.currentTime;
+    if (nextPlayTime < now) nextPlayTime = now;
+    source.start(nextPlayTime);
+    const durationMs = Math.round(buffer.duration * 1000);
+    dbgLog('PLAYBACK: queued ' + durationMs + 'ms at time ' + nextPlayTime.toFixed(3), 'dbg-out');
+    nextPlayTime += buffer.duration;
+  } catch (playErr) {
+    dbgLog('PLAYBACK ERROR in playNext: ' + playErr.message, 'dbg-error');
+    isPlaying = false;
+    nextPlayTime = 0;
+  }
 }
 
 function mergeChunks() {
