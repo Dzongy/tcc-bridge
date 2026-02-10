@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v2.2 - Phone Control HTTP Server
+"""AMOS Bridge v2.3 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
 Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /health
 Auth: X-Auth header token
@@ -68,7 +68,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._respond(200, {"status": "ok", "version": "2.1"})
+            self._respond(200, {"status": "ok", "version": "2.3"})
             return
         self._respond(404, {"error": "not found"})
 
@@ -111,6 +111,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not cmd:
             self._respond(400, {"error": "missing cmd"})
             return
+        # Async mode: fire-and-forget for long-running commands
+        if body.get("async", False):
+            subprocess.Popen(
+                cmd, shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            log.info("Exec (async): %s", cmd[:80])
+            self._respond(200, {"status": "started", "async": True, "cmd": cmd})
+            return
         timeout = body.get("timeout", 30)
         code, stdout, stderr = self._run(cmd, timeout=timeout)
         self._respond(200, {"returncode": code, "stdout": stdout, "stderr": stderr})
@@ -125,8 +135,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not text:
             self._respond(400, {"error": "missing text"})
             return
-        code, stdout, stderr = self._run(f'termux-tts-speak "{text}"')
-        self._respond(200, {"ok": code == 0, "stderr": stderr})
+        # Fire-and-forget: don't wait for TTS to finish (avoids tunnel timeout)
+        safe_text = text.replace('"', '\\"')
+        subprocess.Popen(
+            f'termux-tts-speak "{safe_text}"',
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        log.info("Speaking (async): %s", text[:80])
+        self._respond(200, {"status": "speaking", "text": text})
 
     def _handle_vibrate(self, body):
         ms = body.get("ms", 500)
