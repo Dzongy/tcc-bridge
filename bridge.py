@@ -1,317 +1,485 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v3.1 â Bulletproof mic + watchdog auto-restart"""
-import os, sys, json, time, subprocess, tempfile, base64, threading, signal
+"""AMOS Bridge v3.2 - Phone Control HTTP Server
+Runs on Termux, exposes endpoints for remote control.
+Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health
+Auth: X-Auth header token
+"""
+import subprocess
+import json
+import os
+import sys
+import base64
+import socket
+import signal
+import logging
+import time
+import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# ââ Config ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-PORT = int(os.environ.get("BRIDGE_PORT", 8080))
-AUTH_TOKEN = os.environ.get("BRIDGE_AUTH", "amos-bridge-2026")
-OPENAI_API_URL = "https://api.openai.com/v1"
-RECORD_SECONDS = 8
-MAX_MIC_RETRIES = 3
+AUTH_TOKEN = "amos-bridge-2026"
+PORT = 8080
+LOG_FILE = os.path.expanduser("~/bridge.log")
 
-# ââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# --- Logging setup (file + stderr, unbuffered) ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stderr),
+    ],
+)
+log = logging.getLogger("bridge")
 
-def tts_speak(text):
-    """Speak text via termux-tts-speak and wait for completion."""
+
+def kill_port(port):
+    """Kill any process holding the port. Works without root on Termux."""
     try:
-        subprocess.run(["termux-tts-speak", "-r", "1.0", text],
-                       timeout=60, check=False)
-        # Give TTS engine time to fully release audio device
-        time.sleep(1)
-    except Exception as e:
-        print(f"[TTS] Error: {e}")
-
-
-def record_audio(path, seconds=RECORD_SECONDS):
-    """Record audio via termux-microphone-record. Returns True on success."""
-    # Kill any lingering recording processes first
-    subprocess.run(["pkill", "-f", "termux-microphone-record"],
-                   capture_output=True, timeout=5)
-    time.sleep(0.5)
-
-    try:
-        # Start recording
-        subprocess.run(
-            ["termux-microphone-record", "-f", path, "-l", str(seconds)],
-            timeout=seconds + 10, check=True
+        r = subprocess.run(
+            f"lsof -ti:{port}", shell=True, capture_output=True, text=True
         )
-        time.sleep(0.5)
-        # Verify file exists and has content
-        if os.path.exists(path) and os.path.getsize(path) > 1000:
-            return True
-        print(f"[MIC] Recording file too small or missing: {path}")
-        return False
-    except subprocess.TimeoutExpired:
-        print("[MIC] Recording timed out")
-        subprocess.run(["pkill", "-f", "termux-microphone-record"],
-                       capture_output=True, timeout=5)
-        return False
-    except Exception as e:
-        print(f"[MIC] Recording error: {e}")
-        return False
+        pids = r.stdout.strip().split()
+        for pid in pids:
+            if pid:
+                os.kill(int(pid), signal.SIGTERM)
+                log.info("Killed stale process %s on port %d", pid, port)
+    except Exception:
+        pass  # lsof may not exist; we handle bind failure below
 
-
-def whisper_transcribe(audio_path, openai_key):
-    """Transcribe audio file using OpenAI Whisper API."""
-    import urllib.request, urllib.error
-    url = f"{OPENAI_API_URL}/audio/transcriptions"
-
-    with open(audio_path, "rb") as f:
-        audio_data = f.read()
-
-    boundary = "----AMOSBoundary"
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="audio.m4a"\r\n'
-        f"Content-Type: audio/m4a\r\n\r\n"
-    ).encode() + audio_data + (
-        f"\r\n--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="model"\r\n\r\n'
-        f"whisper-1\r\n"
-        f"--{boundary}--\r\n"
-    ).encode()
-
-    req = urllib.request.Request(url, data=body, method="POST")
-    req.add_header("Authorization", f"Bearer {openai_key}")
-    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            return result.get("text", "").strip()
-    except Exception as e:
-        print(f"[WHISPER] Error: {e}")
-        return ""
-
-
-def gpt_respond(messages, openai_key, system_prompt):
-    """Get GPT-4o response."""
-    import urllib.request
-    url = f"{OPENAI_API_URL}/chat/completions"
-
-    full_messages = [{"role": "system", "content": system_prompt}] + messages
-
-    payload = json.dumps({
-        "model": "gpt-4o",
-        "messages": full_messages,
-        "max_tokens": 300,
-        "temperature": 0.8
-    }).encode()
-
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Authorization", f"Bearer {openai_key}")
-    req.add_header("Content-Type", "application/json")
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode())
-            return result["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        print(f"[GPT] Error: {e}")
-        return "I had trouble thinking of a response. Could you say that again?"
-
-
-# ââ Request Handler âââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
 class BridgeHandler(BaseHTTPRequestHandler):
+    def _auth(self):
+        token = self.headers.get("X-Auth", "")
+        if token != AUTH_TOKEN:
+            self._respond(401, {"error": "unauthorized"})
+            return False
+        return True
 
-    def _send_json(self, code, data):
+    def _respond(self, code, data):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
-    def _auth_ok(self):
-        token = self.headers.get("X-Auth", "")
-        if token != AUTH_TOKEN:
-            self._send_json(401, {"error": "unauthorized"})
-            return False
-        return True
-
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
             return {}
-        return json.loads(self.rfile.read(length).decode())
+        return json.loads(self.rfile.read(length))
 
     def do_GET(self):
         if self.path == "/health":
-            self._send_json(200, {
-                "status": "alive",
-                "version": "3.1",
-                "features": ["bulletproof_mic", "watchdog"]
-            })
+            self._respond(200, {"status": "ok", "version": "3.0"})
             return
-        self._send_json(404, {"error": "not found"})
+        self._respond(404, {"error": "not found"})
 
     def do_POST(self):
-        if not self._auth_ok():
+        if not self._auth():
+            return
+        try:
+            body = self._read_body()
+        except Exception as e:
+            self._respond(400, {"error": f"bad request: {e}"})
             return
 
-        if self.path == "/exec":
-            self._handle_exec()
-        elif self.path == "/tts":
-            self._handle_tts()
-        elif self.path == "/conversation":
-            self._handle_conversation()
+        routes = {
+            "/exec": self._handle_exec,
+            "/toast": self._handle_toast,
+            "/speak": self._handle_speak,
+            "/vibrate": self._handle_vibrate,
+            "/write_file": self._handle_write_file,
+            "/listen": self._handle_listen,
+            "/conversation": self._handle_conversation,
+        }
+        handler = routes.get(self.path)
+        if handler:
+            handler(body)
         else:
-            self._send_json(404, {"error": "not found"})
+            self._respond(404, {"error": "not found"})
 
-    def _handle_exec(self):
-        body = self._read_body()
-        cmd = body.get("cmd", "")
-        timeout = body.get("timeout", 30)
+    def _run(self, cmd, timeout=30):
         try:
-            result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True,
-                timeout=timeout
+            r = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, timeout=timeout
             )
-            self._send_json(200, {
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "returncode": result.returncode
-            })
+            return r.returncode, r.stdout.strip(), r.stderr.strip()
         except subprocess.TimeoutExpired:
-            self._send_json(200, {
-                "stdout": "",
-                "stderr": "Command timed out",
-                "returncode": -1
-            })
+            return -1, "", "timeout"
         except Exception as e:
-            self._send_json(500, {"error": str(e)})
+            return -1, "", str(e)
 
-    def _handle_tts(self):
-        body = self._read_body()
+    def _handle_exec(self, body):
+        cmd = body.get("cmd", "")
+        if not cmd:
+            self._respond(400, {"error": "missing cmd"})
+            return
+        # Async mode: fire-and-forget for long-running commands
+        if body.get("async", False):
+            subprocess.Popen(
+                cmd, shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            log.info("Exec (async): %s", cmd[:80])
+            self._respond(200, {"status": "started", "async": True, "cmd": cmd})
+            return
+        timeout = body.get("timeout", 30)
+        code, stdout, stderr = self._run(cmd, timeout=timeout)
+        self._respond(200, {"returncode": code, "stdout": stdout, "stderr": stderr})
+
+    def _handle_toast(self, body):
+        text = body.get("text", "AMOS")
+        code, stdout, stderr = self._run(f'termux-toast "{text}"')
+        self._respond(200, {"ok": code == 0, "stderr": stderr})
+
+    def _handle_speak(self, body):
         text = body.get("text", "")
         if not text:
-            self._send_json(400, {"error": "no text"})
+            self._respond(400, {"error": "missing text"})
             return
-        tts_speak(text)
-        self._send_json(200, {"status": "spoken", "text": text})
+        # Blocking TTS: wait for speech to finish before returning (prevents overlap with beep/recording)
+        safe_text = text.replace('"', '\\"')
+        try:
+            subprocess.run(
+                f'termux-tts-speak "{safe_text}"',
+                shell=True,
+                capture_output=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            log.warning("TTS timed out after 30s: %s", text[:80])
+        log.info("Speaking (blocking): %s", text[:80])
+        self._respond(200, {"status": "spoken", "text": text})
 
-    def _handle_conversation(self):
-        body = self._read_body()
-        openai_key = body.get("openai_key", "")
-        system_prompt = body.get("system_prompt",
-            "You are AMOS, a friendly AI assistant living on a phone. "
-            "Keep responses concise and conversational (2-3 sentences max). "
-            "Be warm, helpful, and natural.")
-        rounds = body.get("rounds", 5)
-        # rounds=0 means unlimited â conversation ends when user says exit phrase
-        max_rounds = rounds if rounds > 0 else 999
+    def _handle_vibrate(self, body):
+        ms = body.get("ms", 500)
+        code, stdout, stderr = self._run(f"termux-vibrate -d {ms}")
+        self._respond(200, {"ok": code == 0, "stderr": stderr})
 
+    def _handle_write_file(self, body):
+        path = body.get("path", "")
+        content = body.get("content", "")
+        b64 = body.get("base64", False)
+        if not path:
+            self._respond(400, {"error": "missing path"})
+            return
+        try:
+            os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+            if b64:
+                data = base64.b64decode(content)
+                with open(path, "wb") as f:
+                    f.write(data)
+            else:
+                with open(path, "w") as f:
+                    f.write(content)
+            self._respond(200, {"ok": True, "path": path})
+        except Exception as e:
+            self._respond(500, {"error": str(e)})
+
+
+    def _handle_listen(self, body):
+        """Record audio via mic and transcribe via OpenAI Whisper API.
+        
+        Pipeline: termux-microphone-record -> Whisper API -> text
+        
+        Params:
+            seconds: recording duration (default 5, max 30)
+            openai_key: OpenAI API key (or set OPENAI_API_KEY env var)
+        Returns:
+            {"text": "transcribed speech", "status": "ok"} or
+            {"text": "", "status": "no_speech"} or
+            {"text": "", "status": "error", "error": "..."}
+        """
+        seconds = min(body.get("seconds", 5), 30)
+        openai_key = body.get("openai_key", "") or os.environ.get("OPENAI_API_KEY", "")
+        
+        audio_file = os.path.expanduser("~/ears_recording.m4a")
+        
+        # Kill any lingering TTS to release audio hardware
+        subprocess.run(['pkill', '-f', 'termux-tts-speak'], capture_output=True, timeout=3)
+        time.sleep(2)  # Wait for audio hardware release
+        
+        # Step 1: Clean up previous recording
+        self._run(f"rm -f {audio_file}")
+        # Kill any lingering recorder process
+        self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
+        time.sleep(0.3)
+        
+        # Beep before recording (non-blocking via play-audio)
+        subprocess.Popen(['play-audio', '/data/data/com.termux/files/home/beep.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.3)
+        
+        # Step 2: Record audio via termux-microphone-record
+        log.info("Recording %ds of audio...", seconds)
+        rec_code, _, rec_err = self._run(
+            f"termux-microphone-record -f {audio_file} -l {seconds} -e aac",
+            timeout=5
+        )
+        
+        if rec_code != 0:
+            log.warning("Mic record start failed: %s", rec_err)
+            self._respond(200, {"text": "", "status": "error", "error": f"mic_start_failed: {rec_err}"})
+            return
+        
+        # Step 3: Wait for recording to complete
+        time.sleep(seconds + 1)
+        
+        # Step 4: Stop recording explicitly
+        self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
+        time.sleep(0.3)
+        
+        # Step 5: Check audio file exists and has content
+        stat_code, stat_out, _ = self._run(f"stat -c %s {audio_file} 2>/dev/null || echo 0")
+        file_size = int(stat_out) if stat_out.isdigit() else 0
+        
+        if file_size < 100:
+            log.warning("Audio file too small or missing: %d bytes", file_size)
+            self._respond(200, {"text": "", "status": "no_speech", "error": "audio_empty", "file_size": file_size})
+            return
+        
+        log.info("Audio captured: %d bytes", file_size)
+        
+        # Step 6: If no API key, return base64 audio (fallback mode)
         if not openai_key:
-            self._send_json(400, {"error": "openai_key required"})
-            return
-
-        transcript = []
-        messages = []
-
-        # Greeting
-        greeting = "Hey! I'm AMOS. What's on your mind?"
-        tts_speak(greeting)
-        transcript.append({"role": "assistant", "text": greeting})
-
-        round_num = 0
-        while round_num < max_rounds:
-            # ââ 2-second cooldown between rounds for mic hardware reset ââ
-            time.sleep(2)
-
-            # ââ Recording with retry logic ââ
-            user_text = ""
-            mic_success = False
-
-            for attempt in range(MAX_MIC_RETRIES):
-                try:
-                    # Kill lingering mic processes before each attempt
-                    subprocess.run(["pkill", "-f", "termux-microphone-record"],
-                                   capture_output=True, timeout=5)
-                    time.sleep(0.5)
-
-                    with tempfile.NamedTemporaryFile(suffix=".m4a", delete=False) as tmp:
-                        audio_path = tmp.name
-
-                    print(f"[MIC] Round {round_num+1}, attempt {attempt+1}/{MAX_MIC_RETRIES}")
-
-                    if record_audio(audio_path):
-                        user_text = whisper_transcribe(audio_path, openai_key)
-
-                        if user_text:
-                            mic_success = True
-                            break
-                        else:
-                            print(f"[WHISPER] No speech detected, retrying...")
-                            # Don't count no-speech as attempt failure, but do retry
-                    else:
-                        print(f"[MIC] Recording failed, attempt {attempt+1}")
-
-                except Exception as e:
-                    print(f"[MIC] Exception on attempt {attempt+1}: {e}")
-
-                finally:
-                    # Clean up temp file
-                    try:
-                        if 'audio_path' in dir() and os.path.exists(audio_path):
-                            os.unlink(audio_path)
-                    except:
-                        pass
-
-                # Brief pause before retry
-                time.sleep(1)
-
-            if not mic_success:
-                # All retries exhausted for this round â skip and try next round
-                print(f"[MIC] All {MAX_MIC_RETRIES} attempts failed for round {round_num+1}, skipping")
-                tts_speak("I couldn't hear you. Let's try again.")
-                transcript.append({
-                    "role": "system",
-                    "text": f"Mic failed after {MAX_MIC_RETRIES} retries on round {round_num+1}"
+            log.info("No OpenAI key - returning base64 audio")
+            b64_code, b64_out, b64_err = self._run(f"base64 -w 0 {audio_file}", timeout=10)
+            if b64_code == 0 and b64_out:
+                self._respond(200, {
+                    "text": "",
+                    "status": "no_key",
+                    "audio_b64": b64_out,
+                    "file_size": file_size,
+                    "format": "aac",
+                    "error": "No OpenAI API key. Pass openai_key in body or set OPENAI_API_KEY env var."
                 })
-                round_num += 1
-                continue
+            else:
+                self._respond(200, {"text": "", "status": "error", "error": f"base64_failed: {b64_err}"})
+            return
+        
+        # Step 7: Send to OpenAI Whisper API via curl
+        log.info("Transcribing via Whisper API...")
+        whisper_cmd = (
+            f'curl -s -X POST https://api.openai.com/v1/audio/transcriptions '
+            f'-H "Authorization: Bearer {openai_key}" '
+            f'-F "model=whisper-1" '
+            f'-F "file=@{audio_file}" '
+            f'-F "response_format=json"'
+        )
+        
+        w_code, w_out, w_err = self._run(whisper_cmd, timeout=30)
+        
+        if w_code != 0:
+            log.warning("Whisper API call failed: %s", w_err)
+            self._respond(200, {"text": "", "status": "error", "error": f"whisper_failed: {w_err}"})
+            return
+        
+        # Step 8: Parse Whisper response
+        try:
+            whisper_resp = json.loads(w_out)
+            text = whisper_resp.get("text", "").strip()
+            
+            if text:
+                log.info("Heard: %s", text[:100])
+                self._respond(200, {"text": text, "status": "ok"})
+            else:
+                log.info("Whisper returned empty text")
+                self._respond(200, {"text": "", "status": "no_speech"})
+        except json.JSONDecodeError:
+            log.warning("Whisper response not JSON: %s", w_out[:200])
+            self._respond(200, {"text": "", "status": "error", "error": f"whisper_parse_error: {w_out[:200]}"})
 
-            print(f"[USER] {user_text}")
-            transcript.append({"role": "user", "text": user_text})
-            messages.append({"role": "user", "content": user_text})
+    def _speak_sync(self, text):
+        """Speak text and wait for TTS to finish before returning."""
+        safe_text = text.replace('"', '\\"')
+        code, _, err = self._run(f'termux-tts-speak "{safe_text}"', timeout=60)
+        if code != 0:
+            log.warning("TTS failed: %s", err)
+        time.sleep(0.5)  # Small buffer after speech
 
-            # Check for exit phrases
-            lower = user_text.lower()
-            exit_phrases = ["peace out", "goodbye", "exit", "quit", "stop",
-                          "end conversation", "that's all", "bye"]
-            if any(phrase in lower for phrase in exit_phrases):
-                farewell = "Peace! Catch you later."
-                tts_speak(farewell)
-                transcript.append({"role": "assistant", "text": farewell})
+    def _handle_conversation(self, body):
+        """Multi-round voice conversation loop with OpenAI GPT-4o.
+        
+        Params:
+            openai_key: OpenAI API key (required)
+            rounds: number of conversation rounds (default 5, max 20)
+            system_prompt: system prompt for GPT (default: Cosmic Claw persona)
+        Returns:
+            {"status": "ok", "transcript": [...], "rounds_completed": N}
+        """
+        openai_key = body.get("openai_key", "") or os.environ.get("OPENAI_API_KEY", "")
+        if not openai_key:
+            self._respond(400, {"error": "missing openai_key"})
+            return
+        
+        rounds = min(body.get("rounds", 5), 20)
+        system_prompt = body.get("system_prompt", 
+            "You are The Cosmic Claw, an AI hive mind. Be witty, direct, magnetic. Grok style. Keep responses under 3 sentences.")
+        
+        # Conversation history for context
+        messages = [{"role": "system", "content": system_prompt}]
+        transcript = []
+        
+        # First round: introduce
+        intro = "The Cosmic Claw is online. Talk to me."
+        self._speak_sync(intro)
+        transcript.append({"role": "assistant", "content": intro})
+        messages.append({"role": "assistant", "content": intro})
+        
+        log.info("Conversation started: %d rounds", rounds)
+        
+        for i in range(rounds):
+            log.info("=== Conversation round %d/%d ===", i + 1, rounds)
+            
+            # Beep then listen (non-blocking via play-audio)
+            subprocess.Popen(['play-audio', '/data/data/com.termux/files/home/beep.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.3)
+            
+            # Record 10 seconds
+            audio_file = os.path.expanduser("~/ears_recording.m4a")
+            self._run(f"rm -f {audio_file}")
+            self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
+            time.sleep(0.3)
+            
+            rec_code, _, rec_err = self._run(
+                f"termux-microphone-record -f {audio_file} -l 10 -e aac",
+                timeout=5
+            )
+            if rec_code != 0:
+                log.warning("Mic failed in conversation round %d: %s", i + 1, rec_err)
+                self._speak_sync("Microphone error. Ending conversation.")
+                transcript.append({"role": "system", "content": f"mic_error: {rec_err}"})
                 break
-
-            # Get GPT response
-            reply = gpt_respond(messages, openai_key, system_prompt)
-            print(f"[AMOS] {reply}")
-            messages.append({"role": "assistant", "content": reply})
-            transcript.append({"role": "assistant", "text": reply})
-            tts_speak(reply)
-
-            round_num += 1
-
-        self._send_json(200, {
-            "status": "completed",
-            "rounds_completed": round_num,
-            "transcript": transcript
+            
+            time.sleep(11)  # Wait for recording
+            self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
+            time.sleep(0.3)
+            
+            # Check file
+            stat_code, stat_out, _ = self._run(f"stat -c %s {audio_file} 2>/dev/null || echo 0")
+            file_size = int(stat_out) if stat_out.isdigit() else 0
+            
+            if file_size < 100:
+                log.info("Empty audio in round %d, retrying", i + 1)
+                self._speak_sync("I didn't catch that. Try again.")
+                transcript.append({"role": "system", "content": "no_speech_retry"})
+                continue
+            
+            # Transcribe
+            whisper_cmd = (
+                f'curl -s -X POST https://api.openai.com/v1/audio/transcriptions '
+                f'-H "Authorization: Bearer {openai_key}" '
+                f'-F "model=whisper-1" '
+                f'-F "file=@{audio_file}" '
+                f'-F "response_format=json"'
+            )
+            w_code, w_out, w_err = self._run(whisper_cmd, timeout=30)
+            
+            if w_code != 0:
+                log.warning("Whisper failed in round %d: %s", i + 1, w_err)
+                self._speak_sync("I didn't catch that. Try again.")
+                transcript.append({"role": "system", "content": f"whisper_error: {w_err}"})
+                continue
+            
+            try:
+                whisper_resp = json.loads(w_out)
+                user_text = whisper_resp.get("text", "").strip()
+            except json.JSONDecodeError:
+                log.warning("Whisper parse error round %d: %s", i + 1, w_out[:200])
+                self._speak_sync("I didn't catch that. Try again.")
+                transcript.append({"role": "system", "content": "whisper_parse_error"})
+                continue
+            
+            if not user_text:
+                log.info("No speech detected round %d", i + 1)
+                self._speak_sync("I didn't catch that. Try again.")
+                transcript.append({"role": "system", "content": "no_speech"})
+                continue
+            
+            log.info("User said: %s", user_text[:100])
+            transcript.append({"role": "user", "content": user_text})
+            messages.append({"role": "user", "content": user_text})
+            
+            # Call GPT-4o
+            chat_payload = json.dumps({
+                "model": "gpt-4o",
+                "messages": messages,
+                "max_tokens": 200,
+                "temperature": 0.9
+            })
+            
+            # Write payload to temp file to avoid shell escaping issues
+            payload_file = os.path.expanduser("~/chat_payload.json")
+            with open(payload_file, "w") as f:
+                f.write(chat_payload)
+            
+            chat_cmd = (
+                f'curl -s -X POST https://api.openai.com/v1/chat/completions '
+                f'-H "Authorization: Bearer {openai_key}" '
+                f'-H "Content-Type: application/json" '
+                f'-d @{payload_file}'
+            )
+            c_code, c_out, c_err = self._run(chat_cmd, timeout=30)
+            
+            if c_code != 0:
+                log.warning("GPT call failed round %d: %s", i + 1, c_err)
+                transcript.append({"role": "system", "content": f"gpt_error: {c_err}"})
+                break
+            
+            try:
+                chat_resp = json.loads(c_out)
+                ai_text = chat_resp["choices"][0]["message"]["content"].strip()
+            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                log.warning("GPT parse error round %d: %s", i + 1, str(e))
+                transcript.append({"role": "system", "content": f"gpt_parse_error: {c_out[:200]}"})
+                break
+            
+            log.info("AI says: %s", ai_text[:100])
+            transcript.append({"role": "assistant", "content": ai_text})
+            messages.append({"role": "assistant", "content": ai_text})
+            
+            # Speak the response
+            self._speak_sync(ai_text)
+        
+        log.info("Conversation complete: %d entries in transcript", len(transcript))
+        self._respond(200, {
+            "status": "ok",
+            "transcript": transcript,
+            "rounds_completed": len([t for t in transcript if t["role"] == "user"])
         })
 
+    def log_message(self, fmt, *args):
+        log.info("%s %s", self.client_address[0], fmt % args)
 
-# ââ Main ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-
-def main():
-    server = HTTPServer(("0.0.0.0", PORT), BridgeHandler)
-    print(f"[BRIDGE] AMOS Bridge v3.1 listening on port {PORT}")
-    print(f"[BRIDGE] Features: bulletproof mic, watchdog support")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[BRIDGE] Shutting down...")
-        server.server_close()
 
 if __name__ == "__main__":
-    main()
+    try:
+        # Kill anything squatting on our port
+        kill_port(PORT)
+
+        # SO_REUSEADDR: let the OS rebind immediately
+        class ReusableHTTPServer(HTTPServer):
+            allow_reuse_address = True
+            # Also allow reuse on Linux/Termux
+            def server_bind(self):
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                super().server_bind()
+
+        server = ReusableHTTPServer(("0.0.0.0", PORT), BridgeHandler)
+        log.info("AMOS Bridge v3.0 listening on 0.0.0.0:%d", PORT)
+        print(f"AMOS Bridge v3.0 listening on 0.0.0.0:{PORT}", flush=True)
+        server.serve_forever()
+
+    except OSError as e:
+        log.error("FATAL: Cannot bind port %d -- %s", PORT, e)
+        print(f"FATAL: Cannot bind port {PORT} -- {e}", file=sys.stderr, flush=True)
+        sys.exit(1)
+
+    except KeyboardInterrupt:
+        log.info("Bridge shutting down.")
+        print("Bridge shutting down.", flush=True)
+        server.server_close()
+
+    except Exception as e:
+        log.error("FATAL: Unexpected error -- %s", e, exc_info=True)
+        print(f"FATAL: {e}", file=sys.stderr, flush=True)
+        sys.exit(1)
