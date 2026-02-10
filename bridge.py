@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v3.2 - Phone Control HTTP Server
+"""AMOS Bridge v3.3 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
 Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health
 Auth: X-Auth header token
@@ -33,14 +33,15 @@ log = logging.getLogger("bridge")
 
 
 def kill_port(port):
-    """Kill any process holding the port. Works without root on Termux."""
+    """Kill any process holding the port. Skips own PID. Works without root on Termux."""
+    my_pid = os.getpid()
     try:
         r = subprocess.run(
             f"lsof -ti:{port}", shell=True, capture_output=True, text=True
         )
         pids = r.stdout.strip().split()
         for pid in pids:
-            if pid:
+            if pid and int(pid) != my_pid:
                 os.kill(int(pid), signal.SIGTERM)
                 log.info("Killed stale process %s on port %d", pid, port)
     except Exception:
@@ -69,7 +70,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._respond(200, {"status": "ok", "version": "3.0"})
+            self._respond(200, {"status": "ok", "version": "3.3"})
             return
         self._respond(404, {"error": "not found"})
 
@@ -205,9 +206,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
         time.sleep(0.3)
         
-        # Beep before recording (non-blocking via play-audio)
-        subprocess.Popen(['play-audio', '/data/data/com.termux/files/home/beep.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(0.3)
+        # Beep before recording
+        self._run('termux-tts-speak "beep"', timeout=5)
         
         # Step 2: Record audio via termux-microphone-record
         log.info("Recording %ds of audio...", seconds)
@@ -331,8 +331,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             log.info("=== Conversation round %d/%d ===", i + 1, rounds)
             
             # Beep then listen (non-blocking via play-audio)
-            subprocess.Popen(['play-audio', '/data/data/com.termux/files/home/beep.wav'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(0.3)
+            self._run('termux-tts-speak "beep"', timeout=5)
             
             # Record 10 seconds
             audio_file = os.path.expanduser("~/ears_recording.m4a")
@@ -418,7 +417,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 f'-H "Content-Type: application/json" '
                 f'-d @{payload_file}'
             )
-            c_code, c_out, c_err = self._run(chat_cmd, timeout=30)
+            c_code, c_out, c_err = self._run(chat_cmd, timeout=45)
             
             if c_code != 0:
                 log.warning("GPT call failed round %d: %s", i + 1, c_err)
@@ -427,6 +426,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             
             try:
                 chat_resp = json.loads(c_out)
+                if "error" in chat_resp:
+                    log.warning("GPT API error round %d: %s", i + 1, chat_resp["error"])
+                    transcript.append({"role": "system", "content": f"gpt_api_error: {chat_resp['error']}"})
+                    break
                 ai_text = chat_resp["choices"][0]["message"]["content"].strip()
             except (json.JSONDecodeError, KeyError, IndexError) as e:
                 log.warning("GPT parse error round %d: %s", i + 1, str(e))
@@ -451,6 +454,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
         log.info("%s %s", self.client_address[0], fmt % args)
 
 
+def _sigterm_handler(signum, frame):
+    log.info("Received SIGTERM, shutting down gracefully.")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, _sigterm_handler)
+
+
 if __name__ == "__main__":
     try:
         # Kill anything squatting on our port
@@ -465,8 +475,8 @@ if __name__ == "__main__":
                 super().server_bind()
 
         server = ReusableHTTPServer(("0.0.0.0", PORT), BridgeHandler)
-        log.info("AMOS Bridge v3.0 listening on 0.0.0.0:%d", PORT)
-        print(f"AMOS Bridge v3.0 listening on 0.0.0.0:{PORT}", flush=True)
+        log.info("AMOS Bridge v3.3 listening on 0.0.0.0:%d", PORT)
+        print(f"AMOS Bridge v3.3 listening on 0.0.0.0:{PORT}", flush=True)
         server.serve_forever()
 
     except OSError as e:
