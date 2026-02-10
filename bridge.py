@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v3.3 - Phone Control HTTP Server
+"""AMOS Bridge v3.4 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
 Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health
 Auth: X-Auth header token
@@ -297,21 +297,21 @@ class BridgeHandler(BaseHTTPRequestHandler):
         time.sleep(0.5)  # Small buffer after speech
 
     def _handle_conversation(self, body):
-        """Multi-round voice conversation loop with OpenAI GPT-4o.
+        """Always-on voice conversation loop with OpenAI GPT-4o.
         
         Params:
             openai_key: OpenAI API key (required)
-            rounds: number of conversation rounds (default 5, max 20)
             system_prompt: system prompt for GPT (default: Cosmic Claw persona)
         Returns:
             {"status": "ok", "transcript": [...], "rounds_completed": N}
+        Exit phrases: stop, goodbye, peace out, shut down, exit, quit
         """
         openai_key = body.get("openai_key", "") or os.environ.get("OPENAI_API_KEY", "")
         if not openai_key:
             self._respond(400, {"error": "missing openai_key"})
             return
         
-        rounds = min(body.get("rounds", 5), 20)
+        EXIT_PHRASES = ["stop", "goodbye", "peace out", "shut down", "exit", "quit"]
         system_prompt = body.get("system_prompt", 
             "You are The Cosmic Claw, an AI hive mind. Be witty, direct, magnetic. Grok style. Keep responses under 3 sentences.")
         
@@ -325,10 +325,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         transcript.append({"role": "assistant", "content": intro})
         messages.append({"role": "assistant", "content": intro})
         
-        log.info("Conversation started: %d rounds", rounds)
+        log.info("Conversation started: always-on mode (exit phrases active)")
         
-        for i in range(rounds):
-            log.info("=== Conversation round %d/%d ===", i + 1, rounds)
+        round_num = 0
+        while True:
+            round_num += 1
+            log.info("=== Conversation round %d ===", round_num)
             
             # Beep then listen (non-blocking via play-audio)
             self._run('termux-tts-speak "beep"', timeout=5)
