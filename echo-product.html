@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Echo â The Smartest AI You'll Ever Talk To</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0a;color:#e0e0e0;min-height:100vh;overflow-x:hidden}
+a{color:#cc66ff;text-decoration:none}
+a:hover{color:#ff66ff}
+
+.hero{background:linear-gradient(135deg,#0a0a0a 0%,#1a0033 40%,#330066 100%);padding:100px 20px 80px;text-align:center}
+.hero h1{font-size:3.5rem;font-weight:800;background:linear-gradient(45deg,#ff00ff,#00ffff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:20px;letter-spacing:-1px}
+.hero .subtitle{font-size:1.25rem;color:#b0b0b0;max-width:600px;margin:0 auto 40px;line-height:1.6}
+.hero-cta{display:inline-block;padding:16px 40px;background:linear-gradient(135deg,#6600cc,#cc00cc);color:#fff;border-radius:50px;font-size:1.1rem;font-weight:600;transition:all 0.3s;box-shadow:0 8px 30px rgba(204,0,204,0.4)}
+.hero-cta:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(204,0,204,0.6);color:#fff}
+
+.section{padding:80px 20px;max-width:1100px;margin:0 auto}
+.section-title{font-size:2rem;font-weight:700;text-align:center;margin-bottom:50px;color:#fff}
+
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:30px}
+.step{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:40px 30px;text-align:center;transition:all 0.3s}
+.step:hover{border-color:rgba(204,0,204,0.3);transform:translateY(-4px)}
+.step-num{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#6600cc,#cc00cc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;margin:0 auto 20px}
+.step h3{font-size:1.2rem;margin-bottom:12px;color:#fff}
+.step p{color:#999;line-height:1.5;font-size:0.95rem}
+
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px}
+.feature{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:30px 24px}
+.feature-icon{font-size:2rem;margin-bottom:16px}
+.feature h3{font-size:1.1rem;margin-bottom:8px;color:#fff}
+.feature p{color:#999;font-size:0.9rem;line-height:1.5}
+
+.pricing{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;max-width:1000px;margin:0 auto}
+.plan{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:40px 30px;text-align:center;position:relative;transition:all 0.3s}
+.plan:hover{border-color:rgba(204,0,204,0.3);transform:translateY(-4px)}
+.plan.featured{border-color:rgba(204,0,204,0.5);background:rgba(204,0,204,0.05)}
+.plan.featured::before{content:"MOST POPULAR";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#6600cc,#cc00cc);color:#fff;font-size:0.7rem;font-weight:700;padding:4px 16px;border-radius:20px;letter-spacing:1px}
+.plan-name{font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:8px}
+.plan-price{font-size:3rem;font-weight:800;color:#fff;margin-bottom:4px}
+.plan-price span{font-size:1rem;color:#999;font-weight:400}
+.plan-desc{color:#999;font-size:0.9rem;margin-bottom:24px}
+.plan ul{list-style:none;text-align:left;margin-bottom:30px}
+.plan li{padding:8px 0;color:#ccc;font-size:0.95rem;border-bottom:1px solid rgba(255,255,255,0.05)}
+.plan li::before{content:"\2713";color:#cc66ff;margin-right:10px;font-weight:700}
+.plan-btn{display:block;width:100%;padding:14px;border-radius:50px;font-size:1rem;font-weight:600;text-align:center;transition:all 0.3s;border:none;cursor:pointer}
+.plan-btn.primary{background:linear-gradient(135deg,#6600cc,#cc00cc);color:#fff;box-shadow:0 6px 20px rgba(204,0,204,0.4)}
+.plan-btn.primary:hover{box-shadow:0 10px 30px rgba(204,0,204,0.6);transform:translateY(-2px);color:#fff}
+.plan-btn.secondary{background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15)}
+.plan-btn.secondary:hover{background:rgba(255,255,255,0.12);color:#fff}
+
+.footer{text-align:center;padding:40px 20px;border-top:1px solid rgba(255,255,255,0.06);color:#666;font-size:0.85rem}
+.footer a{color:#999}
+.footer a:hover{color:#cc66ff}
+
+@media(max-width:768px){
+.hero h1{font-size:2.2rem}
+.hero .subtitle{font-size:1rem}
+.section{padding:60px 16px}
+.pricing{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+<h1>Echo</h1>
+<p class="subtitle">The smartest AI you'll ever talk to. Voice-first intelligence powered by a proprietary multi-model system that delivers expert-level answers on any topic, instantly.</p>
+<a href="https://dzongy.github.io/tcc-bridge/voice.html" class="hero-cta">Try Echo Free</a>
+</div>
+
+<div class="section">
+<h2 class="section-title">How It Works</h2>
+<div class="steps">
+<div class="step">
+<div class="step-num">1</div>
+<h3>Open Echo</h3>
+<p>Launch the voice interface from any device. No downloads, no setup. Works instantly in your browser.</p>
+</div>
+<div class="step">
+<div class="step-num">2</div>
+<h3>Ask Anything</h3>
+<p>Speak naturally. Ask complex questions, request analysis, brainstorm ideas, or get expert opinions on any subject.</p>
+</div>
+<div class="step">
+<div class="step-num">3</div>
+<h3>Get Expert Answers</h3>
+<p>Receive synthesized responses from multiple AI perspectives, combined into one clear, intelligent answer.</p>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h2 class="section-title">Why Echo Is Different</h2>
+<div class="features">
+<div class="feature">
+<div class="feature-icon">&#127908;</div>
+<h3>Voice-First Interaction</h3>
+<p>Designed for conversation, not typing. Speak naturally and get spoken responses that feel like talking to a brilliant advisor.</p>
+</div>
+<div class="feature">
+<div class="feature-icon">&#129504;</div>
+<h3>Multi-Model Intelligence</h3>
+<p>Unlike single-model chatbots, Echo routes your query through multiple AI systems to deliver richer, more accurate responses.</p>
+</div>
+<div class="feature">
+<div class="feature-icon">&#9889;</div>
+<h3>Instant Responses</h3>
+<p>No loading screens. No spinning wheels. Ask and receive. Real-time voice interaction with sub-second latency.</p>
+</div>
+<div class="feature">
+<div class="feature-icon">&#127760;</div>
+<h3>Works Everywhere</h3>
+<p>Browser-based. No app to install. Works on phones, tablets, laptops, and desktops. Any device, any platform.</p>
+</div>
+</div>
+</div>
+
+<div class="section" id="pricing">
+<h2 class="section-title">Simple Pricing</h2>
+<div class="pricing">
+<div class="plan">
+<div class="plan-name">Free</div>
+<div class="plan-price">$0<span>/month</span></div>
+<div class="plan-desc">Get started instantly</div>
+<ul>
+<li>10 queries per day</li>
+<li>Standard response quality</li>
+<li>Voice interaction</li>
+<li>Browser-based access</li>
+</ul>
+<a href="https://dzongy.github.io/tcc-bridge/voice.html" class="plan-btn secondary">Start Free</a>
+</div>
+<div class="plan featured">
+<div class="plan-name">Pro</div>
+<div class="plan-price">$19<span>/month</span></div>
+<div class="plan-desc">For power users</div>
+<ul>
+<li>Unlimited queries</li>
+<li>Priority processing</li>
+<li>Conversation history</li>
+<li>Enhanced response depth</li>
+</ul>
+<a href="https://buy.stripe.com/bJebIU6T20b60h69884wM0R" class="plan-btn primary">Get Pro</a>
+</div>
+<div class="plan">
+<div class="plan-name">Business</div>
+<div class="plan-price">$49<span>/month</span></div>
+<div class="plan-desc">For teams &amp; builders</div>
+<ul>
+<li>Everything in Pro</li>
+<li>API access</li>
+<li>Custom integrations</li>
+<li>Priority support</li>
+</ul>
+<a href="https://buy.stripe.com/6oU7sE2CM5vq0h62JK4wM0S" class="plan-btn secondary">Get Business</a>
+</div>
+</div>
+</div>
+
+<div class="footer">
+<p>&copy; 2026 <a href="https://dzongy.github.io/tcc-bridge/">The Cosmic Claw</a>. All rights reserved.</p>
+</div>
+
+</body>
+</html>
