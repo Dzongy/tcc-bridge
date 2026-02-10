@@ -298,23 +298,37 @@ class BridgeHandler(BaseHTTPRequestHandler):
         
         Params:
             openai_key: OpenAI API key (required)
-            rounds: number of conversation rounds (default 5, max 20)
+            rounds: number of rounds (default 0 = unlimited, -1 = unlimited, >0 = fixed)
             system_prompt: system prompt for GPT (default: Cosmic Claw persona)
         Returns:
-            {"status": "ok", "transcript": [...], "rounds_completed": N}
+            {"status": "ok", "transcript": [...], "rounds_completed": N, "exit_reason": "..."}
+        
+        Exit phrases (case-insensitive partial match):
+            "stop", "goodbye", "end conversation", "that's all", "peace out"
+        
+        NOTE: Silence detection not yet implemented with termux-microphone-record.
+        Currently uses fixed 10s recording. Future: real-time amplitude monitoring.
         """
         openai_key = body.get("openai_key", "") or os.environ.get("OPENAI_API_KEY", "")
         if not openai_key:
             self._respond(400, {"error": "missing openai_key"})
             return
         
-        rounds = min(body.get("rounds", 5), 20)
+        # rounds: 0 or -1 = unlimited, >0 = fixed count
+        raw_rounds = body.get("rounds", 0)
+        unlimited = raw_rounds <= 0
+        rounds = raw_rounds if raw_rounds > 0 else 999999  # effectively infinite
+        
         system_prompt = body.get("system_prompt", 
             "You are The Cosmic Claw, an AI hive mind. Be witty, direct, magnetic. Grok style. Keep responses under 3 sentences.")
+        
+        # Exit phrases - case-insensitive partial match
+        EXIT_PHRASES = ["stop", "goodbye", "end conversation", "that's all", "peace out"]
         
         # Conversation history for context
         messages = [{"role": "system", "content": system_prompt}]
         transcript = []
+        exit_reason = "max_rounds"
         
         # First round: introduce
         intro = "The Cosmic Claw is online. Talk to me."
@@ -322,16 +336,22 @@ class BridgeHandler(BaseHTTPRequestHandler):
         transcript.append({"role": "assistant", "content": intro})
         messages.append({"role": "assistant", "content": intro})
         
-        log.info("Conversation started: %d rounds", rounds)
+        mode_str = "unlimited" if unlimited else str(raw_rounds)
+        log.info("Conversation started: %s rounds", mode_str)
         
+        round_num = 0
         for i in range(rounds):
-            log.info("=== Conversation round %d/%d ===", i + 1, rounds)
+            round_num = i + 1
+            if unlimited:
+                log.info("=== Conversation round %d (unlimited) ===", round_num)
+            else:
+                log.info("=== Conversation round %d/%d ===", round_num, rounds)
             
             # Beep then listen
             subprocess.run(['termux-media-player', 'play', '/data/data/com.termux/files/home/beep.wav'], capture_output=True, timeout=5)
             time.sleep(0.3)
             
-            # Record 10 seconds
+            # Record 10 seconds (fixed duration - see NOTE above about silence detection)
             audio_file = os.path.expanduser("~/ears_recording.m4a")
             self._run(f"rm -f {audio_file}")
             self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
@@ -342,12 +362,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 timeout=5
             )
             if rec_code != 0:
-                log.warning("Mic failed in conversation round %d: %s", i + 1, rec_err)
+                log.warning("Mic failed in conversation round %d: %s", round_num, rec_err)
                 self._speak_sync("Microphone error. Ending conversation.")
                 transcript.append({"role": "system", "content": f"mic_error: {rec_err}"})
+                exit_reason = "mic_error"
                 break
             
-            time.sleep(11)  # Wait for recording
+            time.sleep(11)  # Wait for recording to finish
             self._run("termux-microphone-record -q 2>/dev/null || true", timeout=3)
             time.sleep(0.3)
             
@@ -356,12 +377,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
             file_size = int(stat_out) if stat_out.isdigit() else 0
             
             if file_size < 100:
-                log.info("Empty audio in round %d, retrying", i + 1)
+                log.info("Empty audio in round %d, retrying", round_num)
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": "no_speech_retry"})
                 continue
             
-            # Transcribe
+            # Transcribe via Whisper
             whisper_cmd = (
                 f'curl -s -X POST https://api.openai.com/v1/audio/transcriptions '
                 f'-H "Authorization: Bearer {openai_key}" '
@@ -372,7 +393,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             w_code, w_out, w_err = self._run(whisper_cmd, timeout=30)
             
             if w_code != 0:
-                log.warning("Whisper failed in round %d: %s", i + 1, w_err)
+                log.warning("Whisper failed in round %d: %s", round_num, w_err)
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": f"whisper_error: {w_err}"})
                 continue
@@ -381,13 +402,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 whisper_resp = json.loads(w_out)
                 user_text = whisper_resp.get("text", "").strip()
             except json.JSONDecodeError:
-                log.warning("Whisper parse error round %d: %s", i + 1, w_out[:200])
+                log.warning("Whisper parse error round %d: %s", round_num, w_out[:200])
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": "whisper_parse_error"})
                 continue
             
             if not user_text:
-                log.info("No speech detected round %d", i + 1)
+                log.info("No speech detected round %d", round_num)
                 self._speak_sync("I didn't catch that. Try again.")
                 transcript.append({"role": "system", "content": "no_speech"})
                 continue
@@ -396,7 +417,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             transcript.append({"role": "user", "content": user_text})
             messages.append({"role": "user", "content": user_text})
             
-            # Call GPT-4o
+            # Check exit phrases BEFORE sending to GPT
+            user_lower = user_text.lower()
+            if any(phrase in user_lower for phrase in EXIT_PHRASES):
+                log.info("Exit phrase detected: '%s'", user_text)
+                farewell = "Peace. The Cosmic Claw signs off."
+                self._speak_sync(farewell)
+                transcript.append({"role": "assistant", "content": farewell})
+                exit_reason = f"exit_phrase: {user_text}"
+                break
+            
+            # Call GPT-4o immediately â no artificial delay
             chat_payload = json.dumps({
                 "model": "gpt-4o",
                 "messages": messages,
@@ -418,30 +449,33 @@ class BridgeHandler(BaseHTTPRequestHandler):
             c_code, c_out, c_err = self._run(chat_cmd, timeout=30)
             
             if c_code != 0:
-                log.warning("GPT call failed round %d: %s", i + 1, c_err)
+                log.warning("GPT call failed round %d: %s", round_num, c_err)
                 transcript.append({"role": "system", "content": f"gpt_error: {c_err}"})
+                exit_reason = "gpt_error"
                 break
             
             try:
                 chat_resp = json.loads(c_out)
                 ai_text = chat_resp["choices"][0]["message"]["content"].strip()
             except (json.JSONDecodeError, KeyError, IndexError) as e:
-                log.warning("GPT parse error round %d: %s", i + 1, str(e))
+                log.warning("GPT parse error round %d: %s", round_num, str(e))
                 transcript.append({"role": "system", "content": f"gpt_parse_error: {c_out[:200]}"})
+                exit_reason = "gpt_parse_error"
                 break
             
             log.info("AI says: %s", ai_text[:100])
             transcript.append({"role": "assistant", "content": ai_text})
             messages.append({"role": "assistant", "content": ai_text})
             
-            # Speak the response
+            # Speak the response â then loop immediately back to listening
             self._speak_sync(ai_text)
         
-        log.info("Conversation complete: %d entries in transcript", len(transcript))
+        log.info("Conversation complete: %d rounds, exit: %s", round_num, exit_reason)
         self._respond(200, {
             "status": "ok",
             "transcript": transcript,
-            "rounds_completed": len([t for t in transcript if t["role"] == "user"])
+            "rounds_completed": len([t for t in transcript if t["role"] == "user"]),
+            "exit_reason": exit_reason
         })
 
     def log_message(self, fmt, *args):
