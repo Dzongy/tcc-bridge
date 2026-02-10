@@ -203,8 +203,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         time.sleep(0.3)
         
         # Beep before recording
-        subprocess.run(['termux-tts-speak', 'beep'], capture_output=True, timeout=5)
-        time.sleep(1)
+        subprocess.run(['termux-media-player', 'play', '/data/data/com.termux/files/home/beep.wav'], capture_output=True, timeout=5)
+        time.sleep(0.3)
         
         # Step 2: Record audio via termux-microphone-record
         log.info("Recording %ds of audio...", seconds)
@@ -328,8 +328,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             log.info("=== Conversation round %d/%d ===", i + 1, rounds)
             
             # Beep then listen
-            subprocess.run(['termux-tts-speak', 'beep'], capture_output=True, timeout=5)
-            time.sleep(1)
+            subprocess.run(['termux-media-player', 'play', '/data/data/com.termux/files/home/beep.wav'], capture_output=True, timeout=5)
+            time.sleep(0.3)
             
             # Record 10 seconds
             audio_file = os.path.expanduser("~/ears_recording.m4a")
