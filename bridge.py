@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v3.4 - Phone Control HTTP Server
+"""AMOS Bridge v4.0 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
-Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health
+Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health, /voice
 Auth: X-Auth header token
 """
 import subprocess
@@ -70,9 +70,27 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._respond(200, {"status": "ok", "version": "3.3"})
+            self._respond(200, {"status": "ok", "version": "4.0"})
+            return
+        if self.path == "/voice":
+            self._serve_voice_html()
             return
         self._respond(404, {"error": "not found"})
+
+    def _serve_voice_html(self):
+        try:
+            html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice.html")
+            with open(html_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(content.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(content.encode("utf-8"))
+        except FileNotFoundError:
+            self._respond(404, {"error": "voice.html not found"})
+        except Exception as e:
+            self._respond(500, {"error": f"failed to serve voice.html: {e}"})
 
     def do_POST(self):
         if not self._auth():
