@@ -75,7 +75,21 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if self.path == "/voice":
             self._serve_voice_html()
             return
+        if self.path == "/tunnel-url":
+            self._serve_tunnel_url()
+            return
         self._respond(404, {"error": "not found"})
+
+    def _serve_tunnel_url(self):
+        url_file = os.path.expanduser("~/current_tunnel_url")
+        try:
+            with open(url_file, "r") as f:
+                url = f.read().strip()
+            self._respond(200, {"tunnel_url": url, "status": "ok"})
+        except FileNotFoundError:
+            self._respond(404, {"tunnel_url": None, "status": "not_yet_available"})
+        except Exception as e:
+            self._respond(500, {"error": str(e)})
 
     def _serve_voice_html(self):
         try:
