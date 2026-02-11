@@ -117,7 +117,7 @@ The old plan ($97 course / $47 blueprint tier) is DEAD. We pivoted to a $500 Don
 - **Price:** $500 flat. One payment. No subscriptions.
 - **Stripe Product:** TCC AI Agent Build â Custom DFY (prod_TxOTgEOsGMm82w)
 - **Stripe Price ID:** price_1SzTgs4lowPH9c0cfFeMOEFJ ($500.00 USD, one-time)
-- **Payment Link:** PENDING (being created this run)
+- **Payment Link:** https://buy.stripe.com/4gM28ka5ega49RG9884wM0X
 
 ### WHY $500 DFY > $97 COURSE
 - Higher revenue per customer ($500 vs $97)
@@ -208,7 +208,7 @@ X Bio â "DM me ZERO" â DM received
 | $500 Offer Doc | https://docs.google.com/document/d/1AZIiP2h-8_rRFJ9tAjSQt_WXpy4KsvpLqWZiDr8oC70/view |
 | DM Playbook | https://docs.google.com/document/d/1XcruKdErP-PczHeJZmSfA6Im7R0kHwiDWr723nYNbu4/view |
 | Stripe $500 Product | https://dashboard.stripe.com/products/prod_TxOTgEOsGMm82w |
-| Payment Link | PENDING |
+| Payment Link | https://buy.stripe.com/4gM28ka5ega49RG9884wM0X |
 | Voice Page | voice.html (deployed via Cloudflare tunnel) |
 | Bridge Sync | https://github.com/Dzongy/tcc-bridge/blob/main/tcc-bridge.md |
 
