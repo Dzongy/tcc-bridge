@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v4.0 - Phone Control HTTP Server
+"""AMOS Bridge v4.1 â PWA Edition - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
 Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health, /voice
 Auth: X-Auth header token
@@ -71,13 +71,23 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._respond(200, {"status": "ok", "version": "4.0"})
+            self._respond(200, {"status": "ok", "version": "4.1"})
             return
         if self.path == "/voice":
             self._serve_voice_html()
             return
         if self.path == "/tunnel-url":
             self._serve_tunnel_url()
+            return
+        # --- PWA static files ---
+        if self.path == "/manifest.json":
+            self._serve_static("manifest.json", "application/manifest+json")
+            return
+        if self.path == "/sw.js":
+            self._serve_static("sw.js", "application/javascript")
+            return
+        if self.path in ("/icon-192.svg", "/icon-512.svg"):
+            self._serve_static("icon.svg", "image/svg+xml")
             return
         self._respond(404, {"error": "not found"})
 
@@ -106,6 +116,23 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(404, {"error": "voice.html not found"})
         except Exception as e:
             self._respond(500, {"error": f"failed to serve voice.html: {e}"})
+
+
+    def _serve_static(self, filename, content_type):
+        """Serve a static file from the bridge directory (no auth required for PWA assets)."""
+        try:
+            fpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+            with open(fpath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(content.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(content.encode("utf-8"))
+        except FileNotFoundError:
+            self._respond(404, {"error": f"{filename} not found"})
+        except Exception as e:
+            self._respond(500, {"error": f"failed to serve {filename}: {e}"})
 
     def do_POST(self):
         if not self._auth():
