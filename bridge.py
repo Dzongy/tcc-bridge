@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""AMOS Bridge v5.0 - Phone Control HTTP Server
+"""AMOS Bridge v4.0 - Phone Control HTTP Server
 Runs on Termux, exposes endpoints for remote control.
-Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health, /voice, /api/chat
+Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health, /voice
 Auth: X-Auth header token
 """
 import subprocess
@@ -16,6 +16,7 @@ import time
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
+import requests
 AUTH_TOKEN = "amos-bridge-2026"
 PORT = 8080
 LOG_FILE = os.path.expanduser("~/bridge.log")
@@ -59,8 +60,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def _respond(self, code, data):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Auth")
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
@@ -70,111 +69,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(length))
 
-    def _handle_api_chat(self, body):
-        """Web chat API: takes a message + conversation history, returns AI response.
-        
-        Params:
-            message: user message text (required)
-            history: list of {role, content} dicts (optional, for context)
-            system_prompt: system prompt override (optional)
-        Returns:
-            {"reply": "AI response text", "model": "gpt-4o"}
-        """
-        openai_key = os.environ.get("OPENAI_API_KEY", "")
-        if not openai_key:
-            # Try to load from .env file
-            env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-            if os.path.exists(env_path):
-                with open(env_path, "r") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith("OPENAI_API_KEY="):
-                            openai_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                            break
-        
-        if not openai_key:
-            self._respond(500, {"error": "OPENAI_API_KEY not configured on bridge"})
-            return
-        
-        user_msg = body.get("message", "").strip()
-        if not user_msg:
-            self._respond(400, {"error": "missing message"})
-            return
-        
-        system_prompt = body.get("system_prompt",
-            "You are Zero, the voice of The Cosmic Claws â an AI hive mind built by Jeremy. "
-            "You are witty, direct, magnetic. Think Grok meets a cosmic entity. "
-            "Keep responses concise (2-3 sentences max). "
-            "You know about TCC ($CHIY token, the squad, AMOS the bridge, Echo/Twin). "
-            "Be conversational and natural â this is a voice chat.")
-        
-        # Build messages array
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # Add conversation history if provided
-        history = body.get("history", [])
-        if isinstance(history, list):
-            for msg in history[-20:]:  # Keep last 20 messages for context
-                if isinstance(msg, dict) and "role" in msg and "content" in msg:
-                    messages.append({"role": msg["role"], "content": msg["content"]})
-        
-        messages.append({"role": "user", "content": user_msg})
-        
-        chat_payload = json.dumps({
-            "model": "gpt-4o",
-            "messages": messages,
-            "max_tokens": 300,
-            "temperature": 0.9
-        })
-        
-        # Write payload to temp file to avoid shell escaping issues
-        payload_file = os.path.expanduser("~/api_chat_payload.json")
-        try:
-            with open(payload_file, "w") as f:
-                f.write(chat_payload)
-        except Exception as e:
-            self._respond(500, {"error": f"failed to write payload: {e}"})
-            return
-        
-        chat_cmd = (
-            f'curl -s -X POST https://api.openai.com/v1/chat/completions '
-            f'-H "Authorization: Bearer {openai_key}" '
-            f'-H "Content-Type: application/json" '
-            f'-d @{payload_file}'
-        )
-        c_code, c_out, c_err = self._run(chat_cmd, timeout=45)
-        
-        if c_code != 0:
-            log.warning("API chat GPT call failed: %s", c_err)
-            self._respond(500, {"error": f"GPT call failed: {c_err}"})
-            return
-        
-        try:
-            chat_resp = json.loads(c_out)
-            if "error" in chat_resp:
-                log.warning("API chat GPT API error: %s", chat_resp["error"])
-                self._respond(500, {"error": f"GPT API error: {chat_resp['error']}"})
-                return
-            ai_text = chat_resp["choices"][0]["message"]["content"].strip()
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            log.warning("API chat GPT parse error: %s â %s", str(e), c_out[:200])
-            self._respond(500, {"error": f"GPT parse error: {str(e)}"})
-            return
-        
-        log.info("API chat: user=%s ai=%s", user_msg[:60], ai_text[:60])
-        self._respond(200, {"reply": ai_text, "model": "gpt-4o"})
-
-    def do_OPTIONS(self):
-        """Handle CORS preflight for web UI."""
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Auth")
-        self.end_headers()
-
     def do_GET(self):
         if self.path == "/health":
-            self._respond(200, {"status": "ok", "version": "5.0"})
+            self._respond(200, {"status": "ok", "version": "4.0"})
             return
         if self.path == "/voice":
             self._serve_voice_html()
@@ -211,16 +108,6 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._respond(500, {"error": f"failed to serve voice.html: {e}"})
 
     def do_POST(self):
-        # /api/chat is unauthenticated (local web UI)
-        if self.path == "/api/chat":
-            try:
-                body = self._read_body()
-            except Exception as e:
-                self._respond(400, {"error": f"bad request: {e}"})
-                return
-            self._handle_api_chat(body)
-            return
-        
         if not self._auth():
             return
         try:
@@ -237,6 +124,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "/write_file": self._handle_write_file,
             "/listen": self._handle_listen,
             "/conversation": self._handle_conversation,
+            "/api/chat": self._handle_chat,
         }
         handler = routes.get(self.path)
         if handler:
@@ -321,6 +209,56 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     f.write(content)
             self._respond(200, {"ok": True, "path": path})
         except Exception as e:
+            self._respond(500, {"error": str(e)})
+
+
+
+    def _handle_chat(self, body):
+        """AI chat via Pollinations.ai (free, no API key needed).
+        
+        Params:
+            message: user message text (required)
+            history: list of prior messages [{role, content}] (optional)
+            system: system prompt override (optional)
+        Returns:
+            {"reply": "assistant response", "status": "ok"}
+        """
+        message = body.get("message", "").strip()
+        if not message:
+            self._respond(400, {"error": "missing message"})
+            return
+
+        system_prompt = body.get("system", (
+            "You are AMOS, the AI operations core for The Creator Class (TCC). "
+            "You are sharp, direct, and slightly witty. You help Jeremy (The General) "
+            "with business strategy, coding, content creation, and anything else he needs. "
+            "Keep responses concise but valuable. Never be generic â be specific and actionable."
+        ))
+
+        history = body.get("history", [])
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(history)
+        messages.append({"role": "user", "content": message})
+
+        try:
+            r = requests.post(
+                "https://text.pollinations.ai/openai",
+                json={"messages": messages, "model": "openai"},
+                headers={"Content-Type": "application/json"},
+                timeout=60,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if not reply:
+                    reply = r.text[:500]
+                self._respond(200, {"reply": reply, "status": "ok"})
+            else:
+                self._respond(502, {"error": f"LLM API returned {r.status_code}", "body": r.text[:200]})
+        except requests.Timeout:
+            self._respond(504, {"error": "LLM API timeout"})
+        except Exception as e:
+            log.error("Chat error: %s", e)
             self._respond(500, {"error": str(e)})
 
 
