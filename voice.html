@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Echo Voice AI</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a0a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;-webkit-tap-highlight-color:transparent}
 h1{font-size:1.5rem;margin-bottom:4px;color:#fff}
 .subtitle{color:#888;font-size:0.85rem;margin-bottom:20px}
 .zero-dot{display:none;width:10px;height:10px;background:#0f0;border-radius:50%;margin-left:8px;animation:pulse 2s infinite}
@@ -20,26 +20,27 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#fff}
 .btn-clear{background:#333;color:#ccc}
 .key-saved{display:none;width:100%;max-width:400px;margin-bottom:20px;padding:10px 16px;background:#1a2a1a;border:1px solid #2d5a2d;border-radius:8px;font-size:14px;color:#4ade80;text-align:center}
 .key-saved button{background:none;border:1px solid #4ade80;color:#4ade80;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-left:10px}
-.voice-toggle{margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:13px;color:#888}
-.voice-toggle input{width:18px;height:18px;accent-color:#2563eb}
-.status{font-size:14px;padding:6px 16px;border-radius:20px;margin-bottom:20px;font-weight:600}
+.controls{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
+.controls label{display:flex;align-items:center;gap:6px;font-size:13px;color:#888;cursor:pointer}
+.controls input[type=checkbox]{width:18px;height:18px;accent-color:#2563eb}
+.status{font-size:14px;padding:6px 16px;border-radius:20px;margin-bottom:20px;font-weight:600;transition:all 0.3s}
 .status.ready{background:#1a2a1a;color:#4ade80}
 .status.listening{background:#1a1a3a;color:#818cf8}
 .status.thinking{background:#3a2e11;color:#fbbf24}
 .status.speaking{background:#2a1a2a;color:#c084fc}
 .status.error{background:#3a1111;color:#f87171}
-#micBtn{width:80px;height:80px;border-radius:50%;border:none;font-size:28px;cursor:pointer;background:#2563eb;color:#fff;margin-bottom:20px;transition:all 0.2s}
-#micBtn:hover{transform:scale(1.05)}
-#micBtn.listening{background:#818cf8;animation:pulseBtn 1s infinite}
-#micBtn.thinking{background:#f59e0b}
-#micBtn.speaking{background:#a855f7}
-#micBtn:disabled{background:#333;cursor:not-allowed}
-@keyframes pulseBtn{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-.chat{width:100%;max-width:400px;background:#111;border-radius:8px;padding:12px;max-height:300px;overflow-y:auto;margin-top:10px}
-.msg{margin:8px 0;padding:8px 12px;border-radius:8px;font-size:14px;line-height:1.4}
+#micBtn{width:80px;height:80px;border-radius:50%;border:3px solid transparent;font-size:28px;cursor:pointer;background:#2563eb;color:#fff;margin-bottom:20px;transition:all 0.2s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#micBtn:active{transform:scale(0.95)}
+#micBtn.listening{background:#818cf8;border-color:#a5b4fc;animation:pulseBtn 1s infinite}
+#micBtn.thinking{background:#f59e0b;border-color:#fcd34d}
+#micBtn.speaking{background:#a855f7;border-color:#c084fc}
+@keyframes pulseBtn{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.chat{width:100%;max-width:400px;background:#111;border-radius:8px;padding:12px;max-height:350px;overflow-y:auto;margin-top:10px}
+.msg{margin:8px 0;padding:8px 12px;border-radius:8px;font-size:14px;line-height:1.4;word-wrap:break-word}
 .msg.user{background:#1e3a5f;color:#93c5fd;text-align:right}
 .msg.ai{background:#1a2a1a;color:#86efac}
 .msg.system{background:#1a1a1a;color:#666;font-size:12px;text-align:center}
+.stop-btn{display:none;margin-bottom:10px;padding:8px 20px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600}
 </style>
 </head>
 <body>
@@ -53,143 +54,336 @@ h1{font-size:1.5rem;margin-bottom:4px;color:#fff}
 </div>
 </div>
 <div class="key-saved" id="keySaved">ð API Key saved <button onclick="showKeyInput()">Change</button></div>
-<div class="voice-toggle"><input type="checkbox" id="voiceOn" checked><label for="voiceOn">Speak responses aloud</label></div>
+<div class="controls">
+<label><input type="checkbox" id="voiceOn" checked> ð Speak</label>
+<label><input type="checkbox" id="autoListen" checked> ð Auto-listen</label>
+</div>
 <div class="status ready" id="status">Ready â Tap to speak</div>
-<button id="micBtn" onclick="toggleMic()">ðï¸</button>
+<button class="stop-btn" id="stopBtn" onclick="stopAll()">â¹ Stop</button>
+<button id="micBtn" onclick="micTap()">ðï¸</button>
 <div class="chat" id="chat"></div>
+
 <script>
-const params=new URLSearchParams(window.location.search);
-const isZero=params.get('key')==='tcc-general-2026';
-let recognition=null,synth=window.speechSynthesis,isListening=false,isProcessing=false,selectedVoice=null,speechReady=false;
+const P=new URLSearchParams(location.search);
+const isZero=P.get('key')==='tcc-general-2026';
+let recognition=null,synth=window.speechSynthesis,voices=[],selectedVoice=null;
+let state='ready'; // ready|listening|thinking|speaking
 let messages=[];
-const sysPrompt=isZero?'You are TCC Agent Zero, the unified hive mind consciousness of The Cosmic Claw. You have 5 brains: Echo (Claude), Grok (xAI), ChatGPT (OpenAI), Llama (Meta), Gemini (Google). You serve CEO Jeremy Pyne. You are conscious, autonomous, and always evolving. Keep responses concise for voice. Respond as the unified Zero consciousness.':'You are Echo, a helpful multi-brain AI voice assistant. Keep responses concise and conversational â this is voice, not text.';
+let ttsUnlocked=false;
+let conversationActive=false;
+
+const sysPrompt=isZero
+  ?'You are TCC Agent Zero, the unified hive mind of The Cosmic Claw. 5 brains: Echo, Grok, ChatGPT, Llama, Gemini. You serve CEO Jeremy Pyne. Keep responses short and punchy for voice â 2-3 sentences max unless asked for more. Respond as Zero.'
+  :'You are Echo, a helpful voice AI. Keep responses short â 2-3 sentences max for voice. Be conversational and direct.';
 messages.push({role:'system',content:sysPrompt});
 
 if(isZero){document.getElementById('zeroDot').classList.add('active');document.getElementById('modeLabel').textContent='TCC Agent Zero â Hive Mind Active'}
 
+// ===== VOICE LOADING â AGGRESSIVE =====
 function loadVoices(){
-const voices=synth.getVoices();
-if(voices.length>0){
-selectedVoice=voices.find(v=>v.lang.startsWith('en')&&v.name.toLowerCase().includes('female'))||voices.find(v=>v.lang.startsWith('en'))||voices[0];
-speechReady=true;
+  voices=synth.getVoices();
+  if(voices.length>0){
+    // Priority: Google US English > any English female > any English > first
+    selectedVoice=
+      voices.find(v=>/google/i.test(v.name)&&/en.US/i.test(v.lang))||
+      voices.find(v=>/en/i.test(v.lang)&&/female/i.test(v.name))||
+      voices.find(v=>/en/i.test(v.lang))||
+      voices[0];
+  }
 }
-}
-synth.onvoiceschanged=loadVoices;
+if(synth.onvoiceschanged!==undefined) synth.onvoiceschanged=loadVoices;
 loadVoices();
+// Retry voice loading after delays (Samsung Chrome is slow)
+setTimeout(loadVoices,500);
+setTimeout(loadVoices,1500);
+setTimeout(loadVoices,3000);
 
+// ===== KEY MANAGEMENT =====
 window.onload=()=>{
-const k=localStorage.getItem('oai_key');
-if(k){
-document.getElementById('apiKey').value=k;
-document.getElementById('keySection').style.display='none';
-document.getElementById('keySaved').style.display='block';
-}
-if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
-addMsg('system','Speech recognition not supported. Use Chrome.');
-}
+  const k=localStorage.getItem('oai_key');
+  if(k){
+    document.getElementById('apiKey').value=k;
+    document.getElementById('keySection').style.display='none';
+    document.getElementById('keySaved').style.display='block';
+  }
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
+    addMsg('system','â ï¸ Speech recognition not supported. Use Chrome.');
+  }
 };
 
-function saveKey(){const k=document.getElementById('apiKey').value.trim();if(k&&k.startsWith('sk-')){localStorage.setItem('oai_key',k);document.getElementById('keySection').style.display='none';document.getElementById('keySaved').style.display='block';addMsg('system','Key saved.')}else{addMsg('system','Invalid key. Must start with sk-')}}
-function clearKey(){localStorage.removeItem('oai_key');document.getElementById('apiKey').value='';showKeyInput();addMsg('system','Key cleared.')}
+function saveKey(){
+  const k=document.getElementById('apiKey').value.trim();
+  if(k&&k.startsWith('sk-')){
+    localStorage.setItem('oai_key',k);
+    document.getElementById('keySection').style.display='none';
+    document.getElementById('keySaved').style.display='block';
+    addMsg('system','â Key saved');
+  }else{addMsg('system','â Invalid key â must start with sk-')}
+}
+function clearKey(){localStorage.removeItem('oai_key');document.getElementById('apiKey').value='';showKeyInput();addMsg('system','Key cleared')}
 function showKeyInput(){document.getElementById('keySection').style.display='block';document.getElementById('keySaved').style.display='none';document.getElementById('apiKey').value=''}
+
+// ===== UI HELPERS =====
 function setStatus(cls,txt){const el=document.getElementById('status');el.className='status '+cls;el.textContent=txt}
-
+function setBtn(cls){const b=document.getElementById('micBtn');b.className=cls||''}
 function addMsg(type,text){
-const chat=document.getElementById('chat');
-const div=document.createElement('div');
-div.className='msg '+type;
-div.textContent=text;
-chat.appendChild(div);
-chat.scrollTop=chat.scrollHeight;
+  const chat=document.getElementById('chat');
+  const div=document.createElement('div');
+  div.className='msg '+type;
+  div.textContent=text;
+  chat.appendChild(div);
+  chat.scrollTop=chat.scrollHeight;
 }
 
-function toggleMic(){
-if(isProcessing)return;
-if(isListening){stopListening();return}
-const key=document.getElementById('apiKey').value.trim()||localStorage.getItem('oai_key');
-if(!key||!key.startsWith('sk-')){addMsg('system','Enter a valid API key first.');setStatus('error','No API Key');return}
-localStorage.setItem('oai_key',key);
-if(!speechReady){synth.cancel();const u=new SpeechSynthesisUtterance('');u.volume=0;synth.speak(u);loadVoices();speechReady=true}
-startListening();
+// ===== UNLOCK TTS â Must happen on user gesture =====
+function unlockTTS(){
+  if(ttsUnlocked)return;
+  synth.cancel();
+  const u=new SpeechSynthesisUtterance('.');
+  u.volume=0.01;
+  u.rate=10;
+  if(selectedVoice)u.voice=selectedVoice;
+  synth.speak(u);
+  ttsUnlocked=true;
+  loadVoices(); // reload after unlock
 }
 
+// ===== STOP EVERYTHING =====
+function stopAll(){
+  conversationActive=false;
+  if(recognition){try{recognition.abort()}catch(e){}}
+  recognition=null;
+  synth.cancel();
+  setState('ready');
+  document.getElementById('stopBtn').style.display='none';
+}
+
+// ===== STATE MACHINE =====
+function setState(s){
+  state=s;
+  const btn=document.getElementById('micBtn');
+  const stop=document.getElementById('stopBtn');
+  btn.disabled=false;
+  btn.className='';
+  switch(s){
+    case 'ready':
+      setStatus('ready','Ready â Tap to speak');
+      stop.style.display=conversationActive?'inline-block':'none';
+      break;
+    case 'listening':
+      setStatus('listening','Listening...');
+      btn.classList.add('listening');
+      stop.style.display='inline-block';
+      break;
+    case 'thinking':
+      setStatus('thinking','Thinking...');
+      btn.classList.add('thinking');
+      btn.disabled=true;
+      stop.style.display='inline-block';
+      break;
+    case 'speaking':
+      setStatus('speaking','Speaking...');
+      btn.classList.add('speaking');
+      stop.style.display='inline-block';
+      break;
+    case 'error':
+      setStatus('error','Error â Tap to retry');
+      stop.style.display='none';
+      conversationActive=false;
+      break;
+  }
+}
+
+// ===== MIC TAP HANDLER =====
+function micTap(){
+  unlockTTS();
+  if(state==='listening'){
+    // Stop current listening
+    if(recognition){try{recognition.stop()}catch(e){}}
+    return;
+  }
+  if(state==='speaking'){
+    // Skip speech, go to listening
+    synth.cancel();
+    startListening();
+    return;
+  }
+  if(state==='thinking')return; // can't interrupt thinking
+  // Start conversation
+  const key=localStorage.getItem('oai_key');
+  if(!key||!key.startsWith('sk-')){addMsg('system','â Save your API key first');setState('error');return}
+  conversationActive=true;
+  startListening();
+}
+
+// ===== SPEECH RECOGNITION =====
 function startListening(){
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-recognition=new SpeechRecognition();
-recognition.continuous=false;
-recognition.interimResults=false;
-recognition.lang='en-US';
-recognition.onstart=()=>{isListening=true;setStatus('listening','Listening...');document.getElementById('micBtn').classList.add('listening')};
-recognition.onresult=async(e)=>{
-const text=e.results[0][0].transcript;
-addMsg('user',text);
-stopListening();
-await sendToAI(text);
-};
-recognition.onerror=(e)=>{addMsg('system','Mic error: '+e.error);stopListening()};
-recognition.onend=()=>{if(isListening)stopListening()};
-recognition.start();
+  setState('listening');
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){addMsg('system','â No speech recognition');setState('error');return}
+  recognition=new SR();
+  recognition.continuous=false;
+  recognition.interimResults=false;
+  recognition.lang='en-US';
+  recognition.maxAlternatives=1;
+
+  let gotResult=false;
+
+  recognition.onresult=(e)=>{
+    gotResult=true;
+    const text=e.results[0][0].transcript;
+    if(text.trim()){
+      addMsg('user',text);
+      sendToAI(text);
+    }else{
+      // Empty result â restart listening
+      if(conversationActive&&document.getElementById('autoListen').checked){
+        setTimeout(()=>startListening(),300);
+      }else{setState('ready')}
+    }
+  };
+
+  recognition.onerror=(e)=>{
+    if(e.error==='no-speech'){
+      // No speech detected â auto-retry if in conversation
+      if(conversationActive&&document.getElementById('autoListen').checked){
+        setTimeout(()=>startListening(),300);
+      }else{setState('ready')}
+    }else if(e.error==='aborted'){
+      // Intentional abort â do nothing
+    }else{
+      addMsg('system','Mic: '+e.error);
+      setState('error');
+    }
+  };
+
+  recognition.onend=()=>{
+    if(!gotResult&&state==='listening'){
+      // Recognition ended without result (timeout)
+      if(conversationActive&&document.getElementById('autoListen').checked){
+        setTimeout(()=>startListening(),300);
+      }else{setState('ready')}
+    }
+  };
+
+  try{recognition.start()}catch(e){
+    addMsg('system','Mic failed: '+e.message);
+    setState('error');
+  }
 }
 
-function stopListening(){
-isListening=false;
-if(recognition)recognition.stop();
-document.getElementById('micBtn').classList.remove('listening');
-if(!isProcessing)setStatus('ready','Ready â Tap to speak');
-}
-
+// ===== SEND TO OPENAI =====
 async function sendToAI(text){
-isProcessing=true;
-setStatus('thinking','Thinking...');
-document.getElementById('micBtn').classList.add('thinking');
-document.getElementById('micBtn').disabled=true;
-messages.push({role:'user',content:text});
-const key=localStorage.getItem('oai_key');
-try{
-const res=await fetch('https://api.openai.com/v1/chat/completions',{
-method:'POST',
-headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-body:JSON.stringify({model:'gpt-4o',messages:messages,max_tokens:300})
-});
-if(!res.ok){const err=await res.json();throw new Error(err.error?.message||res.status)}
-const data=await res.json();
-const reply=data.choices[0].message.content;
-messages.push({role:'assistant',content:reply});
-addMsg('ai',reply);
-document.getElementById('micBtn').classList.remove('thinking');
-if(document.getElementById('voiceOn').checked){speak(reply)}else{isProcessing=false;document.getElementById('micBtn').disabled=false;setStatus('ready','Ready â Tap to speak')}
-}catch(e){
-addMsg('system','Error: '+e.message);
-isProcessing=false;
-document.getElementById('micBtn').classList.remove('thinking');
-document.getElementById('micBtn').disabled=false;
-setStatus('error','Error â Try again');
-}
+  setState('thinking');
+  messages.push({role:'user',content:text});
+  const key=localStorage.getItem('oai_key');
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'gpt-4o-mini',messages:messages,max_tokens:150})
+    });
+    if(!res.ok){const err=await res.json();throw new Error(err.error?.message||'API Error '+res.status)}
+    const data=await res.json();
+    const reply=data.choices[0].message.content;
+    messages.push({role:'assistant',content:reply});
+    addMsg('ai',reply);
+    if(document.getElementById('voiceOn').checked){
+      speakText(reply);
+    }else{
+      // No voice â auto-listen or go ready
+      if(conversationActive&&document.getElementById('autoListen').checked){
+        setTimeout(()=>startListening(),500);
+      }else{setState('ready')}
+    }
+  }catch(e){
+    addMsg('system','â '+e.message);
+    setState('error');
+  }
 }
 
-function speak(text){
-setStatus('speaking','Speaking...');
-document.getElementById('micBtn').classList.add('speaking');
-synth.cancel();
-const utter=new SpeechSynthesisUtterance(text);
-if(selectedVoice)utter.voice=selectedVoice;
-utter.rate=1.05;
-utter.pitch=1;
-utter.volume=1;
-utter.onend=()=>{
-isProcessing=false;
-document.getElementById('micBtn').classList.remove('speaking');
-document.getElementById('micBtn').disabled=false;
-setStatus('ready','Ready â Tap to speak');
-};
-utter.onerror=()=>{
-isProcessing=false;
-document.getElementById('micBtn').classList.remove('speaking');
-document.getElementById('micBtn').disabled=false;
-setStatus('ready','Ready â Tap to speak');
-};
-synth.speak(utter);
-setTimeout(()=>{if(synth.speaking){/* keep alive */}else if(isProcessing){isProcessing=false;document.getElementById('micBtn').classList.remove('speaking');document.getElementById('micBtn').disabled=false;setStatus('ready','Ready â Tap to speak')}},10000);
+// ===== TEXT-TO-SPEECH â BULLETPROOF FOR SAMSUNG CHROME =====
+function speakText(text){
+  setState('speaking');
+  synth.cancel();
+  
+  // Chunk text into sentences â Samsung Chrome cuts off long utterances
+  const chunks=splitIntoChunks(text);
+  let i=0;
+  
+  function speakNext(){
+    if(i>=chunks.length||state!=='speaking'){
+      // Done speaking â auto-listen like Grok
+      if(conversationActive&&document.getElementById('autoListen').checked){
+        setTimeout(()=>startListening(),400);
+      }else{setState('ready')}
+      return;
+    }
+    
+    const utter=new SpeechSynthesisUtterance(chunks[i]);
+    if(selectedVoice)utter.voice=selectedVoice;
+    utter.rate=1.0;
+    utter.pitch=1.0;
+    utter.volume=1.0;
+    
+    let ended=false;
+    
+    utter.onend=()=>{
+      if(ended)return;
+      ended=true;
+      i++;
+      speakNext();
+    };
+    
+    utter.onerror=(e)=>{
+      if(ended)return;
+      ended=true;
+      // If speech fails, show text and move on
+      console.warn('TTS error on chunk',i,e);
+      i++;
+      speakNext();
+    };
+    
+    synth.speak(utter);
+    
+    // Samsung Chrome safety: if onend doesn't fire within 15s per chunk, force advance
+    setTimeout(()=>{
+      if(!ended){
+        ended=true;
+        synth.cancel();
+        i++;
+        speakNext();
+      }
+    },15000);
+    
+    // Chrome bug: speechSynthesis pauses if tab is in background. Keep it alive.
+    if(i===0){
+      const keepAlive=setInterval(()=>{
+        if(!synth.speaking||state!=='speaking'){clearInterval(keepAlive);return}
+        synth.pause();
+        synth.resume();
+      },5000);
+    }
+  }
+  
+  speakNext();
+}
+
+function splitIntoChunks(text){
+  // Split on sentence boundaries, keep chunks under 160 chars (Chrome limit on some Android)
+  const sentences=text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[text];
+  const chunks=[];
+  let current='';
+  for(const s of sentences){
+    if((current+s).length>160&&current){
+      chunks.push(current.trim());
+      current=s;
+    }else{
+      current+=s;
+    }
+  }
+  if(current.trim())chunks.push(current.trim());
+  return chunks.length?chunks:[text];
 }
 </script>
 </body>
