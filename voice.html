@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>AMOS â Voice Line</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AMOS">
+<link rel="apple-touch-icon" href="/icon-192.svg">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--border:#2a2a3a;--accent:#6c5ce7;--accent-glow:rgba(108,92,231,.3);--text:#e8e8f0;--text2:#8888a0;--user-bg:#6c5ce7;--bot-bg:#1e1e2e;--danger:#ff4757;--success:#2ed573}
@@ -60,6 +66,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .msg.bot p{margin:4px 0}
 .msg.bot p:first-child{margin-top:0}
 .msg.bot p:last-child{margin-bottom:0}
+
+/* PWA Install Banner */
+.pwa-install{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#7c3aed,#6c5ce7);padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:1000;transform:translateY(100%);transition:transform .3s ease;box-shadow:0 -4px 20px rgba(124,58,237,.3)}
+.pwa-install.show{transform:translateY(0)}
+.pwa-install-text{flex:1;font-size:14px;font-weight:600;color:#fff}
+.pwa-install-sub{font-size:11px;font-weight:400;opacity:.8;display:block;margin-top:2px}
+.pwa-install-btn{background:#fff;color:#7c3aed;border:none;padding:8px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer}
+.pwa-install-close{background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;padding:4px}
 </style>
 </head>
 <body>
@@ -288,6 +302,53 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 
 // Focus input on load
 input.focus();
+</script>
+
+<!-- PWA Install Banner -->
+<div class="pwa-install" id="pwaInstall">
+  <div class="pwa-install-text">Add AMOS to Home Screen<span class="pwa-install-sub">Launch like a real app â no browser bar</span></div>
+  <button class="pwa-install-btn" id="pwaInstallBtn">Install</button>
+  <button class="pwa-install-close" id="pwaClose">&times;</button>
+</div>
+<script>
+// Service Worker Registration
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').then(r=>console.log('SW registered',r.scope)).catch(e=>console.warn('SW failed',e));
+}
+
+// PWA Install Prompt
+let deferredPrompt=null;
+const banner=document.getElementById('pwaInstall');
+const installBtn=document.getElementById('pwaInstallBtn');
+const closeBtn=document.getElementById('pwaClose');
+
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  if(!localStorage.getItem('pwa-dismissed')){
+    setTimeout(()=>banner.classList.add('show'),1500);
+  }
+});
+
+installBtn.addEventListener('click',async()=>{
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const r=await deferredPrompt.userChoice;
+    console.log('Install:',r.outcome);
+    deferredPrompt=null;
+  }
+  banner.classList.remove('show');
+});
+
+closeBtn.addEventListener('click',()=>{
+  banner.classList.remove('show');
+  localStorage.setItem('pwa-dismissed','1');
+});
+
+window.addEventListener('appinstalled',()=>{
+  banner.classList.remove('show');
+  console.log('AMOS PWA installed');
+});
 </script>
 </body>
 </html>
