@@ -164,11 +164,17 @@ function renderMd(text) {
   return html;
 }
 
+function stripHtml(str) {
+  // Remove any HTML tags from AI responses
+  return str.replace(/<[^>]*>/g, '');
+}
+
 function addMsg(role, text) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'bot') {
-    div.innerHTML = '<div class="sender">AMOS</div><div>' + renderMd(text) + '</div>';
+    const clean = stripHtml(text);
+    div.innerHTML = '<div class="sender">AMOS</div><div>' + renderMd(clean) + '</div>';
   } else {
     div.textContent = text;
   }
