@@ -131,3 +131,15 @@ echo "    grep trycloudflare ~/tunnel.log"
 echo "    curl http://localhost:8080/health"
 echo ""
 echo "============================================"
+
+# --- Reporting ---
+echo "[Auto] Reporting Bridge URL..."
+URL=$(grep -o 'https://.*.trycloudflare.com' ~/tunnel.log | head -n1)
+if [ -n "$URL" ]; then
+    echo "Bridge URL: $URL"
+    if [ -f "report_bridge_stats.py" ]; then
+        python3 report_bridge_stats.py "$URL"
+    fi
+else
+    echo "Could not find Bridge URL to report."
+fi
