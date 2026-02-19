@@ -1,10 +1,30 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# TCC Bridge Watchdog v2.0
+# TCC Watchdog V2
+# Ensures PM2 is running and manages logs
+
+LOG_FILE="$HOME/tcc/logs/watchdog.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+log "Watchdog starting..."
+
 while true; do
-  if ! curl -s http://localhost:8080/health > /dev/null; then
-    echo "$(date): Bridge down! Restarting..."
-    pm2 restart bridge || pm2 start bridge.py --name bridge
-    curl -d "Bridge was down - self-healed." https://ntfy.sh/tcc-zenith-hive
-  fi
-  sleep 60
+    # Check if PM2 is alive
+    if ! pm2 ping > /dev/null 2>&1; then
+        log "PM2 not responding. Restarting..."
+        pm2 resurrect || pm2 start ecosystem.config.js
+    fi
+
+    # Check disk space
+    DISK_USAGE=$(df . | awk 'NR==2 {print $5}' | sed 's/%//')
+    if [ "$DISK_USAGE" -gt 90 ]; then
+        log "Disk space low ($DISK_USAGE%). Clearing logs..."
+        pm2 flush
+        rm -rf $HOME/tcc/logs/*.log.*
+    fi
+
+    sleep 60
 done
