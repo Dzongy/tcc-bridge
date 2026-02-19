@@ -1,31 +1,29 @@
-
 module.exports = {
   apps: [
     {
       name: "tcc-bridge",
       script: "python3",
       args: "bridge.py",
+      cwd: process.env.HOME + "/tcc-bridge",
       autorestart: true,
-      watch: false,
-      max_memory_restart: "100M",
+      restart_delay: 2000,
       env: {
-        BRIDGE_PORT: 8080
+        BRIDGE_AUTH: "amos-bridge-2026",
+        BRIDGE_PORT: "8765"
       }
     },
     {
-      name: "tcc-state-push",
-      script: "python3",
-      args: "state-push.py",
-      autorestart: true,
-      env: {
-        SUPABASE_URL: "https://vbqbbziqleymxcyesmky.supabase.co",
-        NTFY_TOPIC: "tcc-zenith-hive"
-      }
-    },
-    {
-      name: "tcc-tunnel",
+      name: "cloudflared",
       script: "cloudflared",
-      args: "tunnel run --token YOUR_TOKEN_HERE",
+      args: "tunnel run",
+      autorestart: true,
+      restart_delay: 5000
+    },
+    {
+      name: "watchdog",
+      script: "/data/data/com.termux/files/usr/bin/bash",
+      args: "watchdog-v2.sh",
+      cwd: process.env.HOME + "/tcc-bridge",
       autorestart: true
     }
   ]
