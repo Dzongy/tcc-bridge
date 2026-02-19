@@ -1,24 +1,23 @@
-# TCC Bridge V2.5 - Bulletproof Edition
-
-The robust connection between Commander and the Zenith ecosystem.
+# TCC BRIDGE V2 (v5.0.0) — Sovereignty Edition
+Bulletproof, permanent, never goes down.
 
 ## Features
-- **Auto-Healing**: PM2 managed processes with auto-restart.
-- **Health Monitoring**: Periodic checks with ntfy alerts to `tcc-zenith-hive`.
-- **State Push**: Real-time phone telemetry (battery, status) pushed to Supabase.
-- **Persistence**: Termux:Boot integration survives phone reboots.
-- **One-Tap Deployment**: Setup everything with a single command.
+- **Auto-Start:** Starts on phone reboot via Termux:Boot.
+- **Process Management:** Managed by PM2 with auto-restart.
+- **Watchdog:** Bash-level guardian for double redundancy.
+- **Health Checks:** Heartbeat every 5 minutes to ntfy.
+- **State Monitoring:** Real-time battery/wifi status via termux-api.
 
-## Quick Install (Termux)
+## One-Tap Install
+Run this in Termux:
 ```bash
 curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
 ```
 
-## Architecture
-- **bridge.py**: Main HTTP server (Port 8765)
-- **ecosystem.config.js**: PM2 process manager
-- **boot-bridge.sh**: Boot persistence script
-- **state-push.py**: (Legacy/Reference) - Logic integrated into bridge.py
-
----
-*Built by KAEL God Builder for The Cosmic Claws.*
+## Component List
+- `bridge.py`: The core Python bridge server.
+- `deploy-v2.sh`: The master setup script.
+- `boot-bridge.sh`: The boot-time loader.
+- `watchdog-v2.sh`: The process guardian.
+- `state-push.py`: Heartbeat script.
+- `ecosystem.config.js`: PM2 configuration.
