@@ -1,20 +1,27 @@
 module.exports = {
   apps: [
     {
-      name: 'bridge',
-      script: 'bridge.py',
-      interpreter: 'python',
+      name: "tcc-bridge",
+      script: "python3",
+      args: "bridge.py",
       autorestart: true,
-      watch: false,
-      max_memory_restart: '200M',
+      restart_delay: 5000,
       env: {
-        NODE_ENV: 'production'
+        BRIDGE_PORT: "8765",
+        BRIDGE_AUTH: "amos-bridge-2026"
       }
     },
     {
-      name: 'watchdog',
-      script: 'watchdog-v2.sh',
-      interpreter: 'bash',
+      name: "cloudflared",
+      script: "cloudflared",
+      args: "tunnel run --token " + (process.env.CF_TOKEN || "") + " 18ba1a49-fdf9-4a52-a27a-5250d397c5c5",
+      autorestart: true,
+      restart_delay: 10000
+    },
+    {
+      name: "tcc-watchdog",
+      script: "bash",
+      args: "watchdog-v2.sh",
       autorestart: true
     }
   ]
