@@ -1,16 +1,20 @@
-#!/bin/bash
-# TCC Bridge Watchdog v2.0
-# Monitors tunnel and bridge health, alerts ntfy on failure
-
-NTFY_TOPIC="tcc-zenith-hive"
-HEALTH_URL="https://zenith.cosmic-claw.com/health"
+#!/data/data/com.termux/files/usr/bin/bash
+# TCC Watchdog v2.0
+# Monitors Bridge and Cloudflared
 
 while true; do
-  STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
-  if [ "$STATUS" != "200" ]; then
-    echo "Bridge health check failed: $STATUS"
-    curl -d "â ï¸ TCC Bridge Health Check FAILED (Status: $STATUS). Attempting recovery..." "https://ntfy.sh/$NTFY_TOPIC"
-    pm2 restart all
+  # Check Bridge
+  if ! curl -s http://localhost:8080/health > /dev/null; then
+    echo "Bridge down! Restarting..."
+    pm2 restart bridge
+    curl -d "Bridge down on $(hostname)! Restarting..." ntfy.sh/tcc-zenith-hive
   fi
-  sleep 300
+  
+  # Check Cloudflared
+  if ! pgrep -x "cloudflared" > /dev/null; then
+    echo "Cloudflared down! Restarting..."
+    pm2 restart watchdog-v2.sh # Placeholder for tunnel restart if managed by pm2
+  fi
+  
+  sleep 60
 done

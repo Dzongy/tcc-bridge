@@ -1,37 +1,36 @@
 #!/data/data/com.termux/files/usr/bin/bash
-echo "🚀 Installing TCC Bridge V10.0 (Bulletproof)..."
+# TCC Bridge Sovereign V2 — Deployment Script
+# curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
 
-# Dependencies
-pkg update && pkg upgrade -y
-pkg install python python-pip nodejs cloudflared termux-api coreutils debianutils nmap -y
-pip install requests
+echo "Starting Sovereign V2 Deployment..."
 
-# PM2
+# 1. Update Packages
+pkg update -y && pkg upgrade -y
+pkg install -y python nodejs-lts git cloudflared termux-api cronie curl
+
+# 2. Install PM2
 npm install -g pm2
 
-# Setup Repo
-mkdir -p ~/tcc
-cd ~/tcc
-if [ ! -d "tcc-bridge" ]; then
-    git clone https://github.com/Dzongy/tcc-bridge.git
+# 3. Setup Repo
+cd $HOME
+if [ -d "tcc-bridge" ]; then
+  cd tcc-bridge && git pull
+else
+  git clone https://github.com/Dzongy/tcc-bridge.git
+  cd tcc-bridge
 fi
-cd tcc-bridge
-git pull origin main
-chmod +x *.sh
 
-# Setup Termux:Boot
+# 4. Permissions
+chmod +x *.sh *.py
+
+# 5. Termux Boot Setup
 mkdir -p ~/.termux/boot
 cp boot-bridge.sh ~/.termux/boot/
 chmod +x ~/.termux/boot/boot-bridge.sh
 
-# Setup Cron for state-push (runs every 5 minutes)
-(crontab -l 2>/dev/null; echo "*/5 * * * * python3 ~/tcc/tcc-bridge/state-push.py") | crontab -
-
-# Start via PM2
+# 6. Start Services
 pm2 start ecosystem.config.js
 pm2 save
 pm2 startup
 
-echo "✅ BRIDGE V10.0 DEPLOYED."
-echo "Commander, simply run 'pm2 list' to check status."
-curl -d "Bridge V10.0 Deployment Complete on $HOSTNAME" https://ntfy.sh/tcc-zenith-hive
+echo "Deployment Complete. Bridge Sovereign V2 is active."

@@ -1,53 +1,46 @@
 #!/usr/bin/env python3
-import time, requests, os, json, subprocess
+"""
+TCC Bridge — State Push v3.0.0
+Pushes device telemetry to Supabase and ntfy.
+"""
+import subprocess, json, os, socket, time
+from urllib.request import Request, urlopen
 
-SUPABASE_URL = "https://vbqbbziqleymxcyesmky.supabase.co"
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_secret_lIbl-DBgnrt_fejgJjKqg_qR62SVEm")
-DEVICE_ID = "amos-arms"
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vbqbbziqleymxcyesmky.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "tcc-zenith-hive")
+DEVICE_ID = socket.gethostname()
 
-def get_stats():
-    stats = {
+def get_output(cmd):
+    try: return subprocess.check_output(cmd, shell=True).decode().strip()
+    except: return "N/A"
+
+def push():
+    battery = json.loads(get_output("termux-battery-status"))
+    wifi = json.loads(get_output("termux-wifi-connectioninfo"))
+    
+    data = {
         "device_id": DEVICE_ID,
-        "android_version": subprocess.getoutput("getprop ro.build.version.release"),
-        "termux_version": "v0.118",
-        "hostname": subprocess.getoutput("hostname"),
-        "battery": 0,
-        "network": "unknown",
-        "storage": {},
-        "apps_json": {},
-        "raw_output": ""
+        "battery_pct": battery.get("percentage"),
+        "battery_status": battery.get("status"),
+        "wifi_sssid": wifi.get("ssid"),
+        "uptime": get_output("uptime -p"),
+        "last_checkin": time.strftime('%Y-%m-%d %H:%M:%S')
     }
     
-    try:
-        batt = json.loads(subprocess.getoutput("termux-battery-status"))
-        stats["battery"] = int(batt.get("percentage", 0))
-    except: pass
-    
-    try:
-        net = json.loads(subprocess.getoutput("termux-telephony-deviceinfo"))
-        stats["network"] = net.get("network_type", "unknown")
-    except: pass
+    if SUPABASE_KEY:
+        req = Request(f"{SUPABASE_URL}/rest/v1/device_state", 
+            data=json.dumps(data).encode(),
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            })
+        try: urlopen(req, timeout=10)
+        except Exception as e: print(f"Supabase error: {e}")
 
-    try:
-        df = subprocess.getoutput("df -h /data")
-        stats["storage"] = {"info": df}
-    except: pass
-    
-    return stats
-
-def push_state():
-    stats = get_stats()
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
-    }
-    try:
-        r = requests.post(f"{SUPABASE_URL}/rest/v1/device_state", headers=headers, json=stats)
-        print(f"Push status: {r.status_code}")
-    except Exception as e:
-        print(f"Push failed: {e}")
-
-if __name__ == '__main__':
-    push_state()
+if __name__ == "__main__":
+    while True:
+        push()
+        time.sleep(300)
