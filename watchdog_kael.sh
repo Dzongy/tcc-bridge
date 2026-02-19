@@ -1,0 +1,1 @@
+#!/bin/bash\n# Bridge V2 Watchdog\npm2 status | grep -q 'online' || pm2 restart all\n
