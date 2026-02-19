@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TCC Bridge v7.0 â THE DEFINITIVE PERMANENT BRIDGE
+TCC Bridge v7.1 â THE DEFINITIVE PERMANENT BRIDGE
 Brain #10 â Kael â Production Edition
 
 Merges v6.0 baseline + v2.0 features into one bulletproof server.
@@ -47,7 +47,7 @@ from urllib.parse import parse_qs, urlparse
 # CONFIG
 # ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 AUTH_TOKEN   = os.environ.get("BRIDGE_AUTH",   "amos-bridge-2026")
-PORT         = int(os.environ.get("BRIDGE_PORT", "8080"))
+PORT         = int(os.environ.get("BRIDGE_PORT", "8765"))
 SUPABASE_URL = os.environ.get("SUPABASE_URL",  "https://vbqbbziqleymxcyesmky.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY",  "")
 NTFY_TOPIC   = os.environ.get("NTFY_TOPIC",    "tcc-zenith-hive")
@@ -359,15 +359,15 @@ class WatchdogThread(threading.Thread):
         self._failures = 0
 
     def _check_tunnel(self) -> bool:
+        """Check if cloudflared process is running (no recursive HTTP call)."""
         try:
-            req = Request(
-                f"{PUBLIC_URL}/health",
-                headers={"User-Agent": "TCC-Bridge-Watchdog/7.0"}
+            result = subprocess.run(
+                ["pgrep", "-f", "cloudflared"],
+                capture_output=True, timeout=5
             )
-            with urlopen(req, timeout=15) as resp:
-                return resp.status == 200
+            return result.returncode == 0
         except Exception as exc:
-            log.debug("Tunnel health check failed: %s", exc)
+            log.debug("Tunnel process check failed: %s", exc)
             return False
 
     def _check_local(self) -> bool:
