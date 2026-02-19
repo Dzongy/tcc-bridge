@@ -1,15 +1,34 @@
-#!/bin/bash
-# TCC Bridge Watchdog V2
+#!/data/data/com.termux/files/usr/bin/bash
+# Watchdog V3 — The Sentinel
+# Monitoring Bridge, Tunnel, and reporting to ntfy.
+
+TOPIC="tcc-zenith-hive"
+NTFY_URL="https://ntfy.sh/$TOPIC"
+
+alert() {
+  curl -H "Title: Bridge Alert" -H "Priority: urgent" -H "Tags: warning,robot" -d "$1" "$NTFY_URL"
+}
+
+log() {
+  echo "$(date): $1"
+}
+
+log "Sentinel V3 started..."
+
 while true; do
-    if ! curl -s localhost:8080/health | grep -q "OK"; then
-        echo "Bridge down! Restarting..."
-        curl -d "Bridge down! Restarting..." ntfy.sh/tcc-zenith-hive
-        pm2 restart bridge
-    fi
-    # Check cloudflared
-    if ! pgrep cloudflared > /dev/null; then
-        echo "Cloudflared down! Restarting..."
-        cloudflared tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5 &
-    fi
-    sleep 300
+  # Check Bridge
+  if ! nc -z localhost 8765; then
+    log "Bridge offline. Restarting..."
+    pm2 restart tcc-bridge
+    alert "Bridge V10.0 was offline. Sentinel restarted it."
+  fi
+
+  # Check Tunnel
+  if ! pgrep -x "cloudflared" > /dev/null; then
+    log "Cloudflared offline. Restarting..."
+    pm2 restart cloudflared
+    alert "Cloudflared tunnel was offline. Sentinel restarted it."
+  fi
+
+  sleep 60
 done
