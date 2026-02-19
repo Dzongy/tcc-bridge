@@ -1,17 +1,18 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# BRIDGE V2 - INFINITE WATCHDOG
-TUNNEL_ID="18ba1a49-fdf9-4a52-a27a-5250d397c5c5"
-
+# Watchdog V2 - Keeps the Bridge and Tunnel alive
+echo "Watchdog V2 active..."
 while true; do
-  # 1. Start Tunnel if not running
+  # Check Bridge (8765)
+  if ! nc -z localhost 8765; then
+    echo "$(date): Bridge port 8765 not responding. Restarting..."
+    pm2 restart tcc-bridge
+  fi
+  
+  # Check Tunnel
   if ! pgrep -x "cloudflared" > /dev/null; then
-    cloudflared tunnel run $TUNNEL_ID > ~/tcc-bridge/tunnel.log 2>&1 &
+    echo "$(date): Cloudflared process missing. Restarting..."
+    pm2 restart cloudflared
   fi
-
-  # 2. Start PM2 if not running
-  if ! pgrep -f "pm2" > /dev/null; then
-    pm2 start ecosystem.config.js
-  fi
-
+  
   sleep 60
 done
