@@ -1,18 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Watchdog V2 - Keeps the Bridge and Tunnel alive
-echo "Watchdog V2 active..."
+# TCC Bridge Watchdog v2.0
 while true; do
-  # Check Bridge (8765)
-  if ! nc -z localhost 8765; then
-    echo "$(date): Bridge port 8765 not responding. Restarting..."
-    pm2 restart tcc-bridge
+  if ! curl -s http://localhost:8765/health > /dev/null; then
+    echo "$(date): Bridge down! Restarting..."
+    pm2 restart bridge || pm2 start bridge.py --name bridge
+    curl -d "Bridge self-healed on $(hostname)" https://ntfy.sh/tcc-zenith-hive
   fi
-  
-  # Check Tunnel
-  if ! pgrep -x "cloudflared" > /dev/null; then
-    echo "$(date): Cloudflared process missing. Restarting..."
-    pm2 restart cloudflared
-  fi
-  
   sleep 60
 done
