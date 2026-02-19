@@ -1,108 +1,139 @@
 #!/usr/bin/env python3
 """
-TCC BRIDGE V3 â PERMANENT & BULLETPROOF
-- Auto-reconnect & Persistent Listeners
-- Health Endpoint: /health
-- Multi-function: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /voice
-- PM2 Optimized
+TCC Bridge v6.1.0 — BULLETPROOF EDITION (KAEL MOD)
+Permanent phone control HTTP server for Termux.
 """
+import subprocess, json, os, sys, base64, socket, signal, logging, time, threading, traceback
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+from urllib.parse import parse_qs, urlparse
 
-import os, json, time, threading, subprocess, logging, socket, sys, traceback
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
-from urllib.parse import urlparse, parse_qs
-
-# --- CONFIG ---
-CONFIG = {
-    "PORT": 8765,
-    "NTFY_TOPIC": "zenith-escape",
-    "NTFY_HIVE": "tcc-zenith-hive",
-    "SUPABASE_URL": "https://vbqbbziqleymxcyesmky.supabase.co",
-    "SUPABASE_KEY": "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm",
-    "DEVICE_ID": socket.gethostname()
-}
+# -- Config --
+AUTH_TOKEN = os.environ.get("BRIDGE_AUTH", "amos-bridge-2026")
+PORT = int(os.environ.get("BRIDGE_PORT", "8080"))
+LOG_FILE = os.path.expanduser("~/bridge.log")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "tcc-zenith-hive")
+VERSION = "6.1.0"
+START_TIME = time.time()
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler(os.path.expanduser("~/tcc-bridge.log"))]
+    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stderr)],
 )
-log = logging.getLogger("TCC_BRIDGE")
+log = logging.getLogger("bridge")
+
+def ntfy(msg, title="Bridge Update", priority=3, tags=[]):
+    try:
+        data = json.dumps({"topic": NTFY_TOPIC, "title": title, "message": msg, "priority": priority, "tags": tags}).encode()
+        req = Request("https://ntfy.sh", data=data, method="POST")
+        urlopen(req, timeout=5)
+    except: pass
+
+def get_uptime():
+    return str(int(time.time() - START_TIME))
+
+def get_battery():
+    try:
+        res = subprocess.run("termux-battery-status", shell=True, capture_output=True, text=True)
+        return json.loads(res.stdout)
+    except: return {"percentage": -1, "status": "UNKNOWN"}
 
 class BridgeHandler(BaseHTTPRequestHandler):
-    def _send_json(self, data, status=200):
-        self.send_response(status)
-        self.send_header("Content-type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+    def log_message(self, format, *args):
+        log.info("%s - %s" % (self.client_address[0], format%args))
 
     def do_GET(self):
         if self.path == "/health":
-            self._send_json({
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            status = {
                 "status": "online",
-                "uptime": time.time() - START_TIME,
-                "device": CONFIG["DEVICE_ID"],
-                "version": "3.0.0-bulletproof"
-            })
-        elif self.path.startswith("/speak"):
-            query = parse_qs(urlparse(self.path).query)
-            text = query.get("text", [""])[0]
-            if text:
-                subprocess.run(["termux-tts-speak", text])
-                self._send_json({"status": "spoken", "text": text})
-            else:
-                self._send_json({"error": "missing text"}, 400)
-        else:
-            self.send_error(404)
+                "version": VERSION,
+                "uptime": get_uptime(),
+                "battery": get_battery(),
+                "timestamp": time.time()
+            }
+            self.wfile.write(json.dumps(status).encode())
+            return
+
+        # Simple auth check for other endpoints
+        auth_header = self.headers.get('Authorization')
+        if not auth_header or auth_header != f"Bearer {AUTH_TOKEN}":
+            self.send_response(401)
+            self.end_headers()
+            return
+
+        if self.path == "/":
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(f"TCC Bridge {VERSION} Online".encode())
+            return
 
     def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data)
-        path = self.path
+        auth_header = self.headers.get('Authorization')
+        if not auth_header or auth_header != f"Bearer {AUTH_TOKEN}":
+            self.send_response(401)
+            self.end_headers()
+            return
 
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length).decode()
+        
         try:
-            if path == "/exec":
-                cmd = data.get("command")
-                res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                self._send_json({"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode})
-            elif path == "/toast":
-                subprocess.run(["termux-toast", data.get("text", "No text")])
-                self._send_json({"status": "toasted"})
-            elif path == "/vibrate":
-                duration = data.get("duration", 500)
-                subprocess.run(["termux-vibrate", "-d", str(duration)])
-                self._send_json({"status": "vibrated"})
-            elif path == "/write_file":
-                filename = data.get("filename")
-                content = data.get("content")
-                with open(os.path.expanduser(f"~/tcc-bridge-files/{filename}"), "w") as f:
-                    f.write(content)
-                self._send_json({"status": "written", "file": filename})
+            data = json.loads(body)
+            cmd = data.get("command")
+            
+            if self.path == "/exec":
+                res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+                output = {"stdout": res.stdout, "stderr": res.stderr, "code": res.returncode}
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(output).encode())
+                
+            elif self.path == "/toast":
+                subprocess.run(f"termux-toast '{cmd}'", shell=True)
+                self.send_response(200)
+                self.end_headers()
+                
+            elif self.path == "/speak":
+                subprocess.run(f"termux-tts-speak '{cmd}'", shell=True)
+                self.send_response(200)
+                self.end_headers()
+                
             else:
-                self.send_error(404)
+                self.send_response(404)
+                self.end_headers()
+                
         except Exception as e:
-            log.error(traceback.format_exc())
-            self._send_json({"error": str(e)}, 500)
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(str(e).encode())
 
 def run_server():
-    server = HTTPServer(('0.0.0.0', CONFIG["PORT"]), BridgeHandler)
-    log.info(f"Bridge Server V3 running on port {CONFIG['PORT']}")
-    server.serve_forever()
-
-START_TIME = time.time()
-if __name__ == "__main__":
-    os.makedirs(os.path.expanduser("~/tcc-bridge-files"), exist_ok=True)
-    threading.Thread(target=run_server, daemon=True).start()
-    
-    # Alert Hive
+    server = HTTPServer(('0.0.0.0', PORT), BridgeHandler)
+    log.info(f"Starting Bridge v{VERSION} on port {PORT}...")
+    ntfy(f"Bridge v{VERSION} started on port {PORT}. Uptime reset.", "Bridge Online", priority=4, tags=["rocket", "check"])
     try:
-        req = Request(f"https://ntfy.sh/{CONFIG['NTFY_HIVE']}", data=f"BRIDGE V3 ONLINE on {CONFIG['DEVICE_ID']}".encode())
-        req.add_header("Title", "Bridge Awakened")
-        req.add_header("Tags", "robot,rocket")
-        urlopen(req)
-    except: pass
+        server.serve_forever()
+    except Exception as e:
+        err = traceback.format_exc()
+        log.error(f"Server crash: {err}")
+        ntfy(f"Bridge crashed! Error: {str(e)}", "Bridge CRASH", priority=5, tags=["warning", "skull"])
+        sys.exit(1)
 
-    while True:
-        time.sleep(60)
+if __name__ == "__main__":
+    # Signal handlers for clean exit
+    def signal_handler(sig, frame):
+        log.info("Shutting down...")
+        ntfy("Bridge shutting down gracefully.", "Bridge Offline", priority=3, tags=["zzz"])
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    run_server()
