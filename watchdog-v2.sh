@@ -1,10 +1,12 @@
-#!/data/data/com.termux/files/usr/bin/sh
-# Infinite loop to monitor tunnel health
+#!/bin/bash
 while true; do
-  STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://zenith.cosmic-claw.com/health)
-  if [ "$STATUS" != "200" ]; then
-    echo "Tunnel DOWN (Status: $STATUS). Alerting..."
-    curl -d "Bridge Tunnel is DOWN (Status $STATUS)" ntfy.sh/tcc-zenith-hive
+  if ! curl -s http://localhost:8080/health > /dev/null; then
+    pm2 restart bridge
+    curl -d "Local Bridge Down - Restarted" https://ntfy.sh/tcc-zenith-hive
   fi
-  sleep 300
+  if ! curl -s https://zenith.cosmic-claw.com/health > /dev/null; then
+    pm2 restart tunnel
+    curl -d "Public Tunnel Down - Restarting Cloudflared" https://ntfy.sh/tcc-zenith-hive
+  fi
+  sleep 60
 done
