@@ -1,82 +1,50 @@
-// =============================================================================
-// PM2 Ecosystem Config - TCC Zenith
-// Manages: Bridge, Cloudflared Tunnel, Cloudflared Monitor
-// =============================================================================
+// ecosystem.config.js — TCC Bridge v5.0
+// pm2 process definition for the Termux bridge.
+// Usage:
+//   pm2 start ecosystem.config.js
+//   pm2 save
+//   pm2 restart tcc-bridge
 
 module.exports = {
   apps: [
-    // -------------------------------------------------------------------------
-    // 1. TCC Bridge - The main HTTP server
-    // -------------------------------------------------------------------------
     {
-      name: 'tcc-bridge',
-      script: '/data/data/com.termux/files/home/tcc/bridge.py',
-      interpreter: '/data/data/com.termux/files/usr/bin/python3',
-      cwd: '/data/data/com.termux/files/home/tcc',
-      autorestart: true,
-      watch: false,
-      max_restarts: 20,
-      restart_delay: 3000,
-      min_uptime: '10s',
-      env: {
-        BRIDGE_PORT: '8080',
-        BRIDGE_AUTH: process.env.BRIDGE_AUTH || '',
-        SUPABASE_URL: 'https://vbqbbziqleymxcyesmky.supabase.co',
-        SUPABASE_KEY: process.env.SUPABASE_KEY || '',
-        NTFY_OPS_TOPIC: 'zenith-escape',
-        NTFY_HIVE_TOPIC: 'tcc-zenith-hive',
-        HEARTBEAT_INTERVAL: '30',
-        PYTHONUNBUFFERED: '1'
-      },
-      error_file: '/data/data/com.termux/files/home/tcc/logs/bridge-error.log',
-      out_file: '/data/data/com.termux/files/home/tcc/logs/bridge-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      merge_logs: true
-    },
+      // ── Identity ────────────────────────────────────────────
+      name:        "tcc-bridge",
+      script:      "bridge.py",
+      interpreter: "/data/data/com.termux/files/usr/bin/python3",
+      cwd:         require("os").homedir() + "/tcc-bridge",
 
-    // -------------------------------------------------------------------------
-    // 2. Cloudflared Tunnel
-    // -------------------------------------------------------------------------
-    {
-      name: 'tcc-tunnel',
-      script: 'cloudflared',
-      args: 'tunnel --no-autoupdate run --token 18ba1a49-fdf9-4a52-a27a-5250d397c5c5',
-      interpreter: 'none',
-      autorestart: true,
-      watch: false,
-      max_restarts: 50,
-      restart_delay: 5000,
-      min_uptime: '5s',
-      error_file: '/data/data/com.termux/files/home/tcc/logs/tunnel-error.log',
-      out_file: '/data/data/com.termux/files/home/tcc/logs/tunnel-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      merge_logs: true
-    },
+      // ── Process behaviour ───────────────────────────────────
+      watch:        false,          // don't restart on file changes
+      autorestart:  true,
+      max_restarts: 25,             // give up after 25 rapid crashes
+      min_uptime:   "5s",          // must stay alive 5 s to count as "started"
+      restart_delay: 3000,         // wait 3 s between restarts
+      exp_backoff_restart_delay: 200, // exponential back-off seed (ms)
+      kill_timeout:  5000,         // ms to wait for clean shutdown
 
-    // -------------------------------------------------------------------------
-    // 3. Cloudflared Monitor - Watchdog for the tunnel
-    // -------------------------------------------------------------------------
-    {
-      name: 'tcc-monitor',
-      script: '/data/data/com.termux/files/home/tcc/cloudflared_monitor.py',
-      interpreter: '/data/data/com.termux/files/usr/bin/python3',
-      cwd: '/data/data/com.termux/files/home/tcc',
-      autorestart: true,
-      watch: false,
-      max_restarts: 20,
-      restart_delay: 5000,
+      // ── Environment ─────────────────────────────────────────
+      // Values here are DEFAULTS; they are overridden by anything
+      // already exported in the shell (e.g. sourced from ~/.bridge-env).
       env: {
-        HEALTH_URL: 'https://zenith.cosmic-claw.com/health',
-        MONITOR_INTERVAL: '60',
-        FAIL_THRESHOLD: '3',
-        PM2_PROCESS: 'tcc-tunnel',
-        RESTART_COOLDOWN: '120',
-        PYTHONUNBUFFERED: '1'
+        BRIDGE_AUTH:  process.env.BRIDGE_AUTH  || "amos-bridge-2026",
+        BRIDGE_PORT:  process.env.BRIDGE_PORT  || "8080",
+        SUPABASE_URL: process.env.SUPABASE_URL || "https://vbqbbziqleymxcyesmky.supabase.co",
+        SUPABASE_KEY: process.env.SUPABASE_KEY || "",
+        NTFY_TOPIC:   process.env.NTFY_TOPIC   || "tcc-zenith-hive",
       },
-      error_file: '/data/data/com.termux/files/home/tcc/logs/monitor-error.log',
-      out_file: '/data/data/com.termux/files/home/tcc/logs/monitor-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      merge_logs: true
-    }
-  ]
+
+      // ── Logging ─────────────────────────────────────────────
+      error_file:      require("os").homedir() + "/bridge-err.log",
+      out_file:        require("os").homedir() + "/bridge-out.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs:      true,        // combine stdout + stderr in one stream
+      log_type:        "raw",       // no JSON wrapping — bridge logs its own format
+
+      // ── Metrics / monitoring ────────────────────────────────
+      // pm2 will expose these via `pm2 monit` and pm2-web dashboards.
+      instance_var: "INSTANCE_ID",
+      pmx:          true,
+    },
+  ],
 };
