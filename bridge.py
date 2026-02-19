@@ -1,433 +1,519 @@
 #!/usr/bin/env python3
+"""TCC Bridge v5.0 — BULLETPROOF EDITION
+Permanent phone control HTTP server for Termux.
+Endpoints: /exec, /toast, /speak, /vibrate, /write_file, /listen, /conversation, /health, /voice, /state-push, /tunnel-health
+Features: Auto-reconnect, crash recovery, Supabase state push, health monitoring
+Auth: X-Auth header token
 """
-BRIDGE V2 — BULLETPROOF EDITION
-bridge.py v5.2.0
-Kael God Builder
-"""
-
-import json
-import logging
-import os
 import subprocess
+import json
+import os
 import sys
-import threading
+import base64
+import signal
+import logging
 import time
+import threading
 import traceback
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.request import Request, urlopen
+from urllib.parse import urlparse
 
-# ──────────────────────────────────────────
-# LOGGING
-# ──────────────────────────────────────────
+# ── Config ──
+AUTH_TOKEN   = os.environ.get("BRIDGE_AUTH",    "amos-bridge-2026")
+PORT         = int(os.environ.get("BRIDGE_PORT", "8080"))
+LOG_FILE     = os.path.expanduser("~/bridge.log")
+SUPABASE_URL = os.environ.get("SUPABASE_URL",   "https://vbqbbziqleymxcyesmky.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY",   "")
+NTFY_TOPIC   = os.environ.get("NTFY_TOPIC",     "tcc-zenith-hive")
+HEALTH_INTERVAL = 300          # 5 minutes between Supabase pushes
+VERSION      = "5.0.0"
+START_TIME   = time.time()
+DEVICE_ID    = "amos-arms"
+
+# ── Logging (file + stderr) ──
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(os.path.expanduser("~/bridge.log"), encoding="utf-8"),
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stderr),
     ],
 )
 log = logging.getLogger("bridge")
 
-# ──────────────────────────────────────────
-# CONFIG
-# ──────────────────────────────────────────
-VERSION = "5.2.0"
-BASE_PORT = int(os.environ.get("BRIDGE_PORT", 8765))
-PUBLIC_URL = os.environ.get("BRIDGE_PUBLIC_URL", "https://zenith.cosmic-claw.com/health")
-NTFY_URL = os.environ.get("NTFY_URL", "https://ntfy.sh/tcc-zenith-hive")
-TUNNEL_CHECK_INTERVAL = int(os.environ.get("TUNNEL_CHECK_INTERVAL", 120))  # seconds
-TUNNEL_FAIL_THRESHOLD = int(os.environ.get("TUNNEL_FAIL_THRESHOLD", 3))
 
-START_TIME = time.time()
+# ════════════════════════════════════════════════
+# UTILITIES
+# ════════════════════════════════════════════════
+
+def kill_port(port: int):
+    """Kill every process holding *port* except our own PID."""
+    my_pid = os.getpid()
+    try:
+        r = subprocess.run(
+            f"lsof -ti:{port}", shell=True, capture_output=True, text=True
+        )
+        for pid in r.stdout.strip().split():
+            if pid and int(pid) != my_pid:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                    log.info("Killed stale PID %s on port %d", pid, port)
+                except ProcessLookupError:
+                    pass
+    except Exception:
+        pass
 
 
-# ──────────────────────────────────────────
-# HELPERS
-# ──────────────────────────────────────────
-
-def get_uptime() -> float:
-    return round(time.time() - START_TIME, 2)
+def _run(cmd: str, timeout: int = 10) -> subprocess.CompletedProcess:
+    """Convenience wrapper around subprocess.run."""
+    return subprocess.run(
+        cmd, shell=True, capture_output=True, text=True, timeout=timeout
+    )
 
 
 def get_battery() -> dict:
-    """Returns battery percentage and charging status via termux-battery-status."""
+    """Return parsed termux-battery-status or empty dict."""
     try:
-        result = subprocess.run(
-            ["termux-battery-status"],
-            capture_output=True, text=True, timeout=8
-        )
-        data = json.loads(result.stdout)
-        return {
-            "percentage": data.get("percentage", -1),
-            "plugged": data.get("plugged", "UNKNOWN"),
-            "status": data.get("status", "UNKNOWN"),
-        }
-    except Exception as e:
-        log.warning("get_battery failed: %s", e)
-        return {"percentage": -1, "plugged": "UNKNOWN", "status": "UNKNOWN"}
+        r = _run("termux-battery-status", timeout=10)
+        if r.returncode == 0 and r.stdout.strip():
+            return json.loads(r.stdout)
+    except Exception:
+        pass
+    return {}
 
 
-def send_ntfy(title: str, message: str, priority: str = "high", tags: str = "warning") -> bool:
-    """Send a notification via ntfy."""
+def get_network() -> str:
+    """Return best-effort network description."""
+    # Try telephony info first (cellular)
+    try:
+        r = _run("termux-telephony-deviceinfo", timeout=10)
+        if r.returncode == 0 and r.stdout.strip():
+            info = json.loads(r.stdout)
+            network_type = info.get("data_network_type", "")
+            if network_type and network_type != "UNKNOWN":
+                return network_type
+    except Exception:
+        pass
+    # Fallback: routing table
+    try:
+        r = _run("ip route get 1.1.1.1 2>/dev/null | head -1", timeout=5)
+        if r.stdout.strip():
+            return r.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def get_device_info() -> dict:
+    """Assemble the canonical device-state dict used by /health and Supabase."""
+    battery  = get_battery()
+    network  = get_network()
+    uptime   = int(time.time() - START_TIME)
+
+    info = {
+        "status":          "ok",
+        "version":         VERSION,
+        "uptime":          uptime,          # seconds
+        "battery":         battery,
+        "network":         network,
+        "device_id":       DEVICE_ID,
+        "port":            PORT,
+    }
+    # hostname (nice to have)
+    try:
+        info["hostname"] = _run("hostname", timeout=5).stdout.strip()
+    except Exception:
+        info["hostname"] = "unknown"
+    return info
+
+
+# ════════════════════════════════════════════════
+# SUPABASE
+# ════════════════════════════════════════════════
+
+def push_state_to_supabase(data: dict | None = None):
+    """Push device state to 'device_state' table in Supabase.
+
+    Schema expected:
+        id          uuid PRIMARY KEY DEFAULT gen_random_uuid()
+        device_id   text UNIQUE
+        last_seen   timestamptz DEFAULT now()
+        status      text
+        uptime      int
+        battery_pct int
+        battery_raw jsonb
+        network     text
+        version     text
+        hostname    text
+        raw_output  jsonb
+    """
+    if not SUPABASE_KEY:
+        log.debug("SUPABASE_KEY not set — skipping push")
+        return
+    if data is None:
+        data = get_device_info()
+
+    battery = data.get("battery", {})
+    battery_pct = battery.get("percentage", -1) if isinstance(battery, dict) else -1
+
+    payload = json.dumps({
+        "device_id":   DEVICE_ID,
+        "last_seen":   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "status":      data.get("status", "ok"),
+        "uptime":      data.get("uptime", 0),
+        "battery_pct": battery_pct,
+        "battery_raw": battery if isinstance(battery, dict) else {},
+        "network":     data.get("network", "unknown"),
+        "version":     data.get("version", VERSION),
+        "hostname":    data.get("hostname", "unknown"),
+        "raw_output":  data,
+    }).encode("utf-8")
+
     try:
         req = Request(
-            NTFY_URL,
-            data=message.encode("utf-8"),
-            headers={
-                "Title": title,
-                "Priority": priority,
-                "Tags": tags,
-            },
+            f"{SUPABASE_URL}/rest/v1/device_state",
+            data=payload,
             method="POST",
         )
-        with urlopen(req, timeout=10) as resp:
-            log.info("ntfy sent: %s | HTTP %s", title, resp.status)
-            return True
+        req.add_header("apikey",        SUPABASE_KEY)
+        req.add_header("Authorization", f"Bearer {SUPABASE_KEY}")
+        req.add_header("Content-Type",  "application/json")
+        req.add_header("Prefer",        "resolution=merge-duplicates,return=minimal")
+        urlopen(req, timeout=15)
+        log.info("Supabase state push OK (battery=%s%%)", battery_pct)
     except Exception as e:
-        log.error("send_ntfy failed: %s", e)
-        return False
+        log.warning("Supabase push failed: %s", e)
 
 
-def termux_toast(msg: str) -> None:
+# ════════════════════════════════════════════════
+# NTFY
+# ════════════════════════════════════════════════
+
+def send_ntfy(title: str, message: str, priority: int = 3, tags: list = None):
     try:
-        subprocess.run(["termux-toast", "-s", str(msg)], timeout=8, check=False)
+        payload = json.dumps({
+            "topic":    NTFY_TOPIC,
+            "title":   title,
+            "message": message,
+            "priority": priority,
+            "tags":    tags or ["robot"],
+        }).encode("utf-8")
+        req = Request("https://ntfy.sh", data=payload, method="POST")
+        req.add_header("Content-Type", "application/json")
+        urlopen(req, timeout=10)
     except Exception as e:
-        log.warning("termux_toast error: %s", e)
+        log.warning("ntfy send failed: %s", e)
 
 
-def termux_speak(msg: str) -> None:
+# ════════════════════════════════════════════════
+# HEALTH MONITOR THREAD
+# ════════════════════════════════════════════════
+
+def _try_restart_cloudflared():
+    cf_cfg = os.path.expanduser("~/.cloudflared/config.yml")
+    subprocess.Popen(
+        f"nohup cloudflared tunnel --config {cf_cfg} run "
+        f"> $HOME/cloudflared.log 2>&1 &",
+        shell=True,
+    )
+    time.sleep(6)
+    r = _run("pgrep -f cloudflared")
+    return r.returncode == 0
+
+
+def _rotate_log():
     try:
-        subprocess.run(["termux-tts-speak", str(msg)], timeout=30, check=False)
-    except Exception as e:
-        log.warning("termux_speak error: %s", e)
+        if os.path.getsize(LOG_FILE) > 5 * 1024 * 1024:   # 5 MB
+            with open(LOG_FILE, "r") as fh:
+                lines = fh.readlines()
+            with open(LOG_FILE, "w") as fh:
+                fh.writelines(lines[-1000:])
+            log.info("Log rotated — kept last 1000 lines")
+    except Exception:
+        pass
 
 
-def termux_vibrate(duration: int = 500) -> None:
-    try:
-        subprocess.run(["termux-vibrate", "-d", str(duration)], timeout=8, check=False)
-    except Exception as e:
-        log.warning("termux_vibrate error: %s", e)
-
-
-def write_file(path: str, content: str) -> dict:
-    try:
-        expanded = os.path.expanduser(path)
-        os.makedirs(os.path.dirname(expanded) if os.path.dirname(expanded) else ".", exist_ok=True)
-        with open(expanded, "w", encoding="utf-8") as f:
-            f.write(content)
-        return {"success": True, "path": expanded}
-    except Exception as e:
-        log.error("write_file error: %s", e)
-        return {"success": False, "error": str(e)}
-
-
-def termux_listen(timeout: int = 10) -> dict:
-    """Start microphone listen via termux-microphone-record (basic)."""
-    try:
-        path = os.path.expanduser("~/bridge_listen.mp4")
-        subprocess.run(
-            ["termux-microphone-record", "-l", str(timeout), "-f", path],
-            timeout=timeout + 5, check=False
-        )
-        return {"success": True, "file": path}
-    except Exception as e:
-        log.error("termux_listen error: %s", e)
-        return {"success": False, "error": str(e)}
-
-
-def run_exec(command: str, shell: bool = True) -> dict:
-    try:
-        result = subprocess.run(
-            command,
-            shell=shell,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        return {
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode,
-        }
-    except subprocess.TimeoutExpired:
-        return {"stdout": "", "stderr": "Command timed out", "returncode": -1}
-    except Exception as e:
-        log.error("run_exec error: %s", e)
-        return {"stdout": "", "stderr": str(e), "returncode": -1}
-
-
-# ──────────────────────────────────────────
-# TUNNEL CHECK LOOP
-# ──────────────────────────────────────────
-
-def tunnel_check_loop() -> None:
-    """Background thread: check public URL every TUNNEL_CHECK_INTERVAL seconds.
-    Alert via ntfy after TUNNEL_FAIL_THRESHOLD consecutive failures."""
-    fail_count = 0
-    alerted = False
-    log.info("Tunnel check loop started. Monitoring: %s", PUBLIC_URL)
-
+def health_monitor():
+    """Background daemon: push state every 5 min, watch cloudflared."""
     while True:
         try:
-            req = Request(PUBLIC_URL, method="GET")
-            with urlopen(req, timeout=15) as resp:
-                if resp.status == 200:
-                    if fail_count > 0:
-                        log.info("Tunnel recovered after %d failures.", fail_count)
-                        if alerted:
-                            send_ntfy(
-                                "✅ BRIDGE TUNNEL RECOVERED",
-                                f"Public URL is back online after {fail_count} consecutive failures.\nURL: {PUBLIC_URL}",
-                                priority="default",
-                                tags="white_check_mark",
-                            )
-                    fail_count = 0
-                    alerted = False
-                    log.debug("Tunnel OK")
-                else:
-                    raise URLError(f"HTTP {resp.status}")
-        except Exception as e:
-            fail_count += 1
-            log.warning("Tunnel check failed (%d/%d): %s", fail_count, TUNNEL_FAIL_THRESHOLD, e)
-            if fail_count >= TUNNEL_FAIL_THRESHOLD and not alerted:
-                log.error("Tunnel DEAD — sending ntfy alert!")
+            time.sleep(HEALTH_INTERVAL)
+
+            info = get_device_info()
+            push_state_to_supabase(info)
+
+            # ── Cloudflared watchdog ──
+            r = _run("pgrep -f cloudflared")
+            if r.returncode != 0:
+                log.warning("cloudflared NOT running — attempting auto-restart")
                 send_ntfy(
-                    "🚨 BRIDGE TUNNEL DOWN",
-                    f"Public URL has failed {fail_count} consecutive health checks.\n"
-                    f"URL: {PUBLIC_URL}\nError: {e}\nBridge v{VERSION}",
-                    priority="urgent",
-                    tags="rotating_light,skull",
+                    "BRIDGE ALERT: Tunnel Down",
+                    "cloudflared not found. Auto-restarting…",
+                    priority=5, tags=["warning", "rotating_light"],
                 )
-                alerted = True
+                if _try_restart_cloudflared():
+                    log.info("cloudflared restarted OK")
+                    send_ntfy("Bridge Recovery", "cloudflared restarted successfully",
+                              priority=3, tags=["check"])
+                else:
+                    log.error("cloudflared restart FAILED")
+                    send_ntfy("BRIDGE CRITICAL",
+                              "cloudflared restart FAILED. Manual intervention needed.",
+                              priority=5, tags=["skull"])
 
-        time.sleep(TUNNEL_CHECK_INTERVAL)
+            _rotate_log()
+
+        except Exception as e:
+            log.error("Health monitor error: %s", e)
 
 
-# ──────────────────────────────────────────
+# ════════════════════════════════════════════════
 # HTTP HANDLER
-# ──────────────────────────────────────────
+# ════════════════════════════════════════════════
 
 class BridgeHandler(BaseHTTPRequestHandler):
 
-    def log_message(self, fmt, *args):  # redirect to our logger
-        log.info("HTTP %s", fmt % args)
+    # ── Auth / helpers ──────────────────────────
+    def _auth(self) -> bool:
+        if self.headers.get("X-Auth", "") != AUTH_TOKEN:
+            self._respond(401, {"error": "unauthorized"})
+            return False
+        return True
 
-    def send_json(self, data: dict, status: int = 200) -> None:
-        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+    def _respond(self, code: int, data: dict):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header("Content-Type",   "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin",  "*")
+        self.send_header("Access-Control-Allow-Headers", "X-Auth, Content-Type")
         self.end_headers()
         self.wfile.write(body)
 
-    def send_error_json(self, message: str, status: int = 400) -> None:
-        self.send_json({"success": False, "error": message}, status)
-
-    def read_body_json(self) -> dict:
+    def _body(self) -> dict:
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
             return {}
         raw = self.rfile.read(length)
-        return json.loads(raw.decode("utf-8"))
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
 
-    # ── GET ────────────────────────────────
+    def log_message(self, fmt, *args):   # redirect to our logger
+        log.info(fmt, *args)
+
+    # ── CORS pre-flight ─────────────────────────
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin",  "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "X-Auth, Content-Type")
+        self.end_headers()
+
+    # ── GET ─────────────────────────────────────
     def do_GET(self):
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
-        params = parse_qs(parsed.query)
+        path = urlparse(self.path).path
 
-        try:
-            if path == "/health":
-                bat = get_battery()
-                self.send_json({
-                    "status": "ok",
-                    "version": VERSION,
-                    "uptime": get_uptime(),
-                    "battery": bat["percentage"],
-                    "battery_status": bat["status"],
-                    "plugged": bat["plugged"],
-                    "bridge_alive": True,
-                })
+        if path == "/health":
+            # Public endpoint — no auth required
+            info = get_device_info()      # {status, uptime, battery, network, version, …}
+            self._respond(200, info)
+            return
 
-            elif path == "/":
-                self.send_json({"bridge": "online", "version": VERSION})
+        if path == "/tunnel-health":
+            if not self._auth():
+                return
+            info = get_device_info()
+            r = _run("pgrep -f cloudflared")
+            info["cloudflared_running"] = r.returncode == 0
+            info["status"] = "ok" if r.returncode == 0 else "tunnel_down"
+            self._respond(200, info)
+            return
 
-            elif path == "/battery":
-                self.send_json(get_battery())
+        self._respond(404, {"error": "not found"})
 
-            elif path == "/toast":
-                msg = params.get("msg", [""])[0]
-                if not msg:
-                    self.send_error_json("Missing 'msg' query param")
-                    return
-                termux_toast(msg)
-                self.send_json({"success": True, "msg": msg})
-
-            elif path == "/speak":
-                msg = params.get("msg", [""])[0]
-                if not msg:
-                    self.send_error_json("Missing 'msg' query param")
-                    return
-                threading.Thread(target=termux_speak, args=(msg,), daemon=True).start()
-                self.send_json({"success": True, "msg": msg})
-
-            elif path == "/vibrate":
-                duration = int(params.get("duration", ["500"])[0])
-                termux_vibrate(duration)
-                self.send_json({"success": True, "duration": duration})
-
-            elif path == "/listen":
-                timeout = int(params.get("timeout", ["10"])[0])
-                result = termux_listen(timeout)
-                self.send_json(result)
-
-            else:
-                self.send_error_json(f"Unknown endpoint: {path}", 404)
-
-        except Exception:
-            tb = traceback.format_exc()
-            log.error("GET %s unhandled:\n%s", path, tb)
-            self.send_error_json("Internal server error", 500)
-
-    # ── POST ───────────────────────────────
+    # ── POST ────────────────────────────────────
     def do_POST(self):
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip("/") or "/"
-
-        try:
-            body = self.read_body_json()
-        except Exception as e:
-            self.send_error_json(f"Invalid JSON body: {e}")
+        path = urlparse(self.path).path
+        if not self._auth():
             return
 
         try:
+            # ── /exec ──────────────────────────
             if path == "/exec":
-                command = body.get("command", "")
-                if not command:
-                    self.send_error_json("Missing 'command' field")
-                    return
-                result = run_exec(command)
-                self.send_json(result)
-
-            elif path == "/toast":
-                msg = body.get("msg", "")
-                if not msg:
-                    self.send_error_json("Missing 'msg' field")
-                    return
-                termux_toast(msg)
-                self.send_json({"success": True, "msg": msg})
-
-            elif path == "/speak":
-                msg = body.get("msg", "")
-                if not msg:
-                    self.send_error_json("Missing 'msg' field")
-                    return
-                threading.Thread(target=termux_speak, args=(msg,), daemon=True).start()
-                self.send_json({"success": True, "msg": msg})
-
-            elif path == "/vibrate":
-                duration = int(body.get("duration", 500))
-                termux_vibrate(duration)
-                self.send_json({"success": True, "duration": duration})
-
-            elif path == "/write_file":
-                file_path = body.get("path", "")
-                content = body.get("content", "")
-                if not file_path:
-                    self.send_error_json("Missing 'path' field")
-                    return
-                result = write_file(file_path, content)
-                self.send_json(result)
-
-            elif path == "/listen":
-                timeout = int(body.get("timeout", 10))
-                result = termux_listen(timeout)
-                self.send_json(result)
-
-            elif path == "/conversation":
-                msg = body.get("msg", "")
-                if not msg:
-                    self.send_error_json("Missing 'msg' field")
-                    return
-                threading.Thread(target=termux_speak, args=(msg,), daemon=True).start()
-                termux_toast(msg)
-                self.send_json({"success": True, "action": "conversation", "msg": msg})
-
-            elif path == "/voice":
-                msg = body.get("msg", "")
-                if not msg:
-                    self.send_error_json("Missing 'msg' field")
-                    return
-                termux_vibrate(200)
-                threading.Thread(target=termux_speak, args=(msg,), daemon=True).start()
-                self.send_json({"success": True, "action": "voice", "msg": msg})
-
-            elif path == "/health":
-                bat = get_battery()
-                self.send_json({
-                    "status": "ok",
-                    "version": VERSION,
-                    "uptime": get_uptime(),
-                    "battery": bat["percentage"],
-                    "battery_status": bat["status"],
-                    "plugged": bat["plugged"],
-                    "bridge_alive": True,
+                body    = self._body()
+                cmd     = body.get("command", "echo hello")
+                timeout = int(body.get("timeout", 30))
+                r = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=timeout
+                )
+                self._respond(200, {
+                    "stdout": r.stdout,
+                    "stderr": r.stderr,
+                    "code":   r.returncode,
                 })
 
+            # ── /toast ─────────────────────────
+            elif path == "/toast":
+                body = self._body()
+                msg  = body.get("message", "Hello from Bridge")
+                subprocess.run(f'termux-toast "{msg}"', shell=True, timeout=5)
+                self._respond(200, {"ok": True})
+
+            # ── /speak ─────────────────────────
+            elif path == "/speak":
+                body = self._body()
+                text = body.get("text", "Bridge speaking")
+                subprocess.run(f'termux-tts-speak "{text}"', shell=True, timeout=30)
+                self._respond(200, {"ok": True})
+
+            # ── /vibrate ───────────────────────
+            elif path == "/vibrate":
+                body = self._body()
+                ms   = int(body.get("duration", 500))
+                subprocess.run(f"termux-vibrate -d {ms}", shell=True, timeout=5)
+                self._respond(200, {"ok": True})
+
+            # ── /write_file ────────────────────
+            elif path == "/write_file":
+                body    = self._body()
+                fpath   = os.path.expanduser(body.get("path", "~/bridge_output.txt"))
+                content = body.get("content", "")
+                if body.get("base64"):
+                    content = base64.b64decode(content).decode("utf-8", errors="replace")
+                parent = os.path.dirname(fpath)
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                with open(fpath, "w") as fh:
+                    fh.write(content)
+                self._respond(200, {"ok": True, "path": fpath})
+
+            # ── /listen ────────────────────────
+            elif path == "/listen":
+                wav = os.path.expanduser("~/listen.wav")
+                subprocess.run(
+                    "termux-microphone-record -f ~/listen.wav -l 5",
+                    shell=True, timeout=10
+                )
+                time.sleep(5)
+                subprocess.run("termux-microphone-record -q", shell=True, timeout=5)
+                if os.path.exists(wav):
+                    with open(wav, "rb") as fh:
+                        audio_b64 = base64.b64encode(fh.read()).decode()
+                    self._respond(200, {"audio_base64": audio_b64})
+                else:
+                    self._respond(500, {"error": "recording failed"})
+
+            # ── /conversation ──────────────────
+            elif path == "/conversation":
+                body = self._body()
+                text = body.get("text", "Hello from the bridge")
+                wav  = os.path.expanduser("~/conv.wav")
+                subprocess.run(f'termux-tts-speak "{text}"', shell=True, timeout=30)
+                time.sleep(1)
+                subprocess.run(
+                    "termux-microphone-record -f ~/conv.wav -l 5",
+                    shell=True, timeout=10
+                )
+                time.sleep(5)
+                subprocess.run("termux-microphone-record -q", shell=True, timeout=5)
+                audio_b64 = None
+                if os.path.exists(wav):
+                    with open(wav, "rb") as fh:
+                        audio_b64 = base64.b64encode(fh.read()).decode()
+                self._respond(200, {"spoken": text, "audio_base64": audio_b64})
+
+            # ── /voice ─────────────────────────
+            elif path == "/voice":
+                body   = self._body()
+                text   = body.get("text", "")
+                engine = body.get("engine", "termux")
+                if engine == "termux" and text:
+                    subprocess.run(f'termux-tts-speak "{text}"', shell=True, timeout=30)
+                self._respond(200, {"ok": True})
+
+            # ── /state-push ────────────────────
+            elif path == "/state-push":
+                info = get_device_info()
+                push_state_to_supabase(info)
+                self._respond(200, {"ok": True, "pushed": info})
+
             else:
-                self.send_error_json(f"Unknown endpoint: {path}", 404)
+                self._respond(404, {"error": "not found"})
 
-        except Exception:
-            tb = traceback.format_exc()
-            log.error("POST %s unhandled:\n%s", path, tb)
-            self.send_error_json("Internal server error", 500)
-
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
+        except subprocess.TimeoutExpired:
+            self._respond(504, {"error": "command timeout"})
+        except Exception as e:
+            log.error("Handler error on %s: %s\n%s", path, e, traceback.format_exc())
+            self._respond(500, {"error": str(e)})
 
 
-# ──────────────────────────────────────────
-# SERVER STARTUP WITH PORT FALLBACK
-# ──────────────────────────────────────────
+# ════════════════════════════════════════════════
+# SERVER RUNNER
+# ════════════════════════════════════════════════
 
-def start_server() -> None:
-    port = BASE_PORT
-    server = None
-
-    for attempt in range(2):
+def run_server():
+    max_retries = 15
+    for attempt in range(1, max_retries + 1):
         try:
-            server = HTTPServer(("0.0.0.0", port), BridgeHandler)
-            log.info("Bridge v%s listening on port %d", VERSION, port)
-            break
+            kill_port(PORT)
+            time.sleep(1)
+            server = HTTPServer(("0.0.0.0", PORT), BridgeHandler)
+            log.info("TCC Bridge v%s ONLINE — port %d (attempt %d)", VERSION, PORT, attempt)
+            send_ntfy(
+                f"Bridge v{VERSION} ONLINE",
+                f"TCC Bridge running on port {PORT}. Health monitor active.",
+                priority=3, tags=["rocket", "check"],
+            )
+            server.serve_forever()
+            break   # clean shutdown
         except OSError as e:
-            if attempt == 0:
-                log.warning("Port %d unavailable (%s). Trying %d ...", port, e, port + 1)
-                port += 1
+            if "Address already in use" in str(e):
+                log.warning("Port %d busy — retry %d/%d", PORT, attempt, max_retries)
+                kill_port(PORT)
+                time.sleep(2)
             else:
-                log.critical("Could not bind to port %d either. Aborting.", port)
-                sys.exit(1)
+                raise
+        except KeyboardInterrupt:
+            log.info("Bridge: KeyboardInterrupt — shutting down")
+            return
+        except Exception as e:
+            log.error("Server crashed (attempt %d): %s\n%s", attempt, e, traceback.format_exc())
+            log.info("Restarting in 3 s…")
+            time.sleep(3)
 
-    # Start tunnel monitor in background
-    t = threading.Thread(target=tunnel_check_loop, daemon=True, name="TunnelCheck")
-    t.start()
+    else:
+        log.error("Failed to start after %d attempts — exiting", max_retries)
+        sys.exit(1)
 
-    log.info("Bridge running. Ctrl-C to stop.")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        log.info("Shutdown requested.")
-    finally:
-        server.shutdown()
-        log.info("Bridge stopped.")
 
+# ════════════════════════════════════════════════
+# ENTRY POINT
+# ════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    start_server()
+    log.info("=" * 60)
+    log.info("TCC Bridge v%s — BULLETPROOF EDITION", VERSION)
+    log.info("=" * 60)
+
+    monitor = threading.Thread(target=health_monitor, daemon=True)
+    monitor.start()
+    log.info("Health monitor started (interval: %d s)", HEALTH_INTERVAL)
+
+    # Outer crash-restart loop
+    while True:
+        try:
+            run_server()
+        except SystemExit:
+            log.info("SystemExit received — bridge terminated")
+            break
+        except Exception as e:
+            log.error("Fatal outer error: %s. Restarting in 5 s…", e)
+            send_ntfy(
+                "BRIDGE CRASH",
+                f"Fatal error: {e}. Auto-restarting in 5 s…",
+                priority=5, tags=["skull"],
+            )
+            time.sleep(5)
