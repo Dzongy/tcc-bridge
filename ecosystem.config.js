@@ -1,37 +1,44 @@
+// ecosystem.config.js — PM2 process manager config for TCC Bridge V2
+// Manages: bridge_v2.py + cloudflared tunnel
+
 module.exports = {
   apps: [
     {
-      name: "tcc-bridge",
-      script: "python3",
-      args: "bridge.py",
-      cwd: "/data/data/com.termux/files/home/tcc-bridge",
+      name: "tcc-bridge-v2",
+      script: "bridge_v2.py",
+      interpreter: "python3",
+      cwd: process.env.HOME + "/tcc-bridge",
       autorestart: true,
-      restart_delay: 5000,
+      watch: false,
+      max_restarts: 20,
+      restart_delay: 4000,
+      min_uptime: "10s",
+      exp_backoff_restart_delay: 100,
       env: {
-        BRIDGE_AUTH: "amos-bridge-2026",
-        BRIDGE_PORT: "8080",
-        NTFY_TOPIC: "tcc-zenith-hive"
-      }
+        PYTHONUNBUFFERED: "1"
+      },
+      error_file:  process.env.HOME + "/.pm2/logs/tcc-bridge-v2-error.log",
+      out_file:    process.env.HOME + "/.pm2/logs/tcc-bridge-v2-out.log",
+      merge_logs:  true,
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z"
     },
     {
-      name: "cloudflared",
+      name: "cloudflared-tunnel",
+      // cloudflared binary expected at ~/bin/cloudflared or in PATH
       script: "cloudflared",
-      args: "tunnel --config /data/data/com.termux/files/home/.cloudflared/config.yml run",
+      interpreter: "none",
+      args: "tunnel run --token 18ba1a49-fdf9-4a52-a27a-5250d397c5c5",
+      cwd: process.env.HOME,
       autorestart: true,
-      restart_delay: 10000
-    },
-    {
-      name: "state-pusher",
-      script: "python3",
-      args: "state-push.py",
-      cwd: "/data/data/com.termux/files/home/tcc-bridge",
-      autorestart: true,
-      restart_delay: 300000,
-      env: {
-        SUPABASE_URL: "https://vbqbbziqleymxcyesmky.supabase.co",
-        SUPABASE_KEY: "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm",
-        NTFY_TOPIC: "tcc-zenith-hive"
-      }
+      watch: false,
+      max_restarts: 50,
+      restart_delay: 5000,
+      min_uptime: "5s",
+      exp_backoff_restart_delay: 200,
+      error_file:  process.env.HOME + "/.pm2/logs/cloudflared-error.log",
+      out_file:    process.env.HOME + "/.pm2/logs/cloudflared-out.log",
+      merge_logs:  true,
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z"
     }
   ]
 };
