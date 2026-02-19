@@ -1,5 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# TCC Bridge — Boot Script v2.0
+# TCC Boot Loader
 termux-wake-lock
-pm2 resurrect
-cloudflared tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5 &
+echo "Booting TCC Infrastructure..."
+sleep 15
+pm2 resurrect || pm2 start $HOME/tcc-bridge/ecosystem.config.js
+# Ensure crond is running for other tasks
+crond 2>/dev/null || true
