@@ -1,38 +1,29 @@
-#!/bin/bash
-# TCC Bridge V2 - ONE TAP SETUP
-# Installs everything and starts the permanent bridge.
-
-set -e
-
-echo "Starting TCC Bridge V2 Setup..."
+#!/data/data/com.termux/files/usr/bin/sh
+# BRIDGE V2: ONE-TAP SETUP (v5.2)
+echo "ð Starting Bridge V2 Sovereign Install..."
 
 # 1. Update & Dependencies
 pkg update -y
-pkg install -y python nodejs-lts termux-api cloudflared nmap procps
-
-# 2. PM2 Setup
+pkg install python nodejs-lts termux-api cloudflared -y
 npm install -g pm2
 
-# 3. Setup Directories
-mkdir -p ~/tcc/logs
+# 2. Setup Directories
 mkdir -p ~/.termux/boot
+mkdir -p ~/tcc-bridge && cd ~/tcc-bridge
 
-# 4. Termux:Boot Link
-cp boot-bridge.sh ~/.termux/boot/boot-bridge.sh
-chmod +x ~/.termux/boot/boot-bridge.sh
+# 3. Download Files
+REPO="https://raw.githubusercontent.com/Dzongy/tcc-bridge/main"
+curl -sS -o bridge.py "$REPO/bridge.py"
+curl -sS -o ecosystem.config.js "$REPO/ecosystem.config.js"
+curl -sS -o state-push.py "$REPO/state-push.py"
+curl -sS -o ~/.termux/boot/boot-bridge.sh "$REPO/boot-bridge.sh"
 
-# 5. Make scripts executable
-chmod +x *.sh
-chmod +x *.py
+chmod +x bridge.py state-push.py ~/.termux/boot/boot-bridge.sh
 
-# 6. Start PM2
+# 4. Start PM2
+pm2 stop all || true
 pm2 start ecosystem.config.js
 pm2 save
-pm2 startup
 
-echo "----------------------------------------"
-echo "SETUP COMPLETE!"
-echo "Bridge: http://localhost:8080"
-echo "Tunnel: zenith.cosmic-claw.com"
-echo "PM2 Dashboard: pm2 list"
-echo "----------------------------------------"
+echo "â BRIDGE V2 INSTALLED."
+echo "Check ntfy tcc-zenith-hive for status."
