@@ -147,7 +147,7 @@ nohup cloudflared tunnel \\
 # ── Start bridge via pm2 ──
 cd "$BRIDGE_DIR"
 pm2 delete tcc-bridge 2>/dev/null || true
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.js && pm2 save
 pm2 save
 
 # ── Start crond for cron backup ──
