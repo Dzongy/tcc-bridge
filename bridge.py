@@ -1,117 +1,74 @@
 #!/usr/bin/env python3
 """
-TCC Bridge V2.1 - Bulletproof Edition
-Built by Kael for Commander.
-Features: Auto-reconnect, Health endpoint, Traceback logging, Supabase state push.
+TCC Bridge v5.2 — BULLETPROOF EDITION
+Permanent phone control HTTP server for Termux.
 """
+import subprocess, json, os, sys, base64, socket, signal, logging, time, threading, traceback
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+from urllib.parse import parse_qs, urlparse
 
-import os
-import json
-import time
-import threading
-import subprocess
-import logging
-import traceback
-import socket
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
-from urllib.parse import urlparse
-import urllib.request
+# -- Config --
+AUTH_TOKEN = os.environ.get("BRIDGE_AUTH", "amos-bridge-2026")
+PORT = int(os.environ.get("BRIDGE_PORT", "8080"))
+LOG_FILE = os.path.expanduser("~/bridge.log")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vbqbbziqleymxcyesmky.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "tcc-zenith-hive")
+HEALTH_INTERVAL = 300
+PUBLIC_URL = os.environ.get("PUBLIC_URL", "https://zenith.cosmic-claw.com")
+VERSION = "5.2.0"
+START_TIME = time.time()
 
-# --- CONFIG ---
-SUPABASE_URL     = "https://vbqbbziqleymxcyesmky.supabase.co"
-SUPABASE_KEY     = "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm"
-NTFY_TOPIC       = "zenith-escape"
-NTFY_BASE        = "https://ntfy.sh"
-SERVER_PORT      = 8765
-HEARTBEAT_SEC    = 60
-REPORT_SEC       = 300 # Push state every 5 mins
-MAX_RETRIES      = 5
-RETRY_BACKOFF    = [2, 4, 8, 16, 32]
-DEVICE_ID        = socket.gethostname()
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler(sys.stderr)])
+log = logging.getLogger("bridge")
 
-# --- LOGGING ---
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler("bridge.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("BridgeV2")
+def ntfy(msg, priority=3):
+    try:
+        req = Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode('utf-8'))
+        req.add_header("Title", "Bridge V2 Alert")
+        req.add_header("Priority", str(priority))
+        urlopen(req)
+    except Exception as e: log.error(f"ntfy failed: {e}")
+
+class HealthThread(threading.Thread):
+    def run(self):
+        log.info("Health monitoring started.")
+        while True:
+            time.sleep(HEALTH_INTERVAL)
+            try:
+                # 1. Check local health
+                uptime = int(time.time() - START_TIME)
+                state = {"status": "online", "uptime": uptime, "version": VERSION, "timestamp": time.time()}
+                
+                # 2. Push to Supabase (Mocked for now, need exact table)
+                # ...
+                
+                # 3. Check Public URL (Self-reachability)
+                try:
+                    urlopen(f"{PUBLIC_URL}/health", timeout=15)
+                    log.info("Public health check passed.")
+                except Exception as e:
+                    log.warning(f"Public health check FAILED: {e}")
+                    ntfy(f"⚠️ Bridge unreachable from outside! Attempting tunnel restart. Error: {e}", 4)
+                    subprocess.run("pm2 restart cloudflared", shell=True)
+            except Exception as e: log.error(f"HealthThread error: {e}")
 
 class BridgeHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/health':
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok", "ts": time.time(), "device": DEVICE_ID}).encode())
+        if self.path == "/health":
+            self.send_response(200); self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok", "version": VERSION}).encode())
         else:
-            self.send_response(404)
-            self.end_headers()
-
-    def do_POST(self):
-        # Handle incoming commands from Twin/Commander
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        try:
-            data = json.loads(post_data)
-            logger.info(f"Received command: {data.get('command')}")
-            # Process command logic here...
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "received"}).encode())
-        except Exception as e:
-            logger.error(f"Error processing POST: {traceback.format_exc()}")
-            self.send_response(500)
-            self.end_headers()
-
-def ntfy_alert(msg, priority=3, tags=[]):
-    try:
-        req = Request(f"{NTFY_BASE}/{NTFY_TOPIC}", data=msg.encode('utf-8'))
-        req.add_header("Title", "Bridge V2 Status")
-        req.add_header("Priority", str(priority))
-        req.add_header("Tags", ",".join(tags))
-        urlopen(req, timeout=5)
-    except:
-        logger.error("Failed to send ntfy alert")
-
-def push_to_supabase(table, data):
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/{table}"
-        req = Request(url, data=json.dumps(data).encode('utf-8'), method='POST')
-        req.add_header("apikey", SUPABASE_KEY)
-        req.add_header("Authorization", f"Bearer {SUPABASE_KEY}")
-        req.add_header("Content-Type", "application/json")
-        req.add_header("Prefer", "return=minimal")
-        urlopen(req, timeout=10)
-    except Exception as e:
-        logger.error(f"Supabase push failed: {e}")
-
-def heartbeat_loop():
-    while True:
-        try:
-            state = {
-                "device_id": DEVICE_ID,
-                "status": "online",
-                "uptime": time.time(),
-                "last_check": ts
-            }
-            push_to_supabase("kael_memory", {"id": "bridge_status", "memory": state})
-        except:
-            pass
-        time.sleep(HEARTBEAT_SEC)
+            self.send_response(404); self.end_headers()
 
 def run_server():
-    server = HTTPServer(('0.0.0.0', SERVER_PORT), BridgeHandler)
-    logger.info(f"Bridge V2 listening on port {SERVER_PORT}")
-    ntfy_alert("Bridge V2 Bulletproof Edition is ONLINE", priority=4, tags=["rocket", "check"])
+    server = HTTPServer(('0.0.0.0', PORT), BridgeHandler)
+    log.info(f"Bridge V2 listening on {PORT}...")
+    t = HealthThread(daemon=True)
+    t.start()
     server.serve_forever()
 
 if __name__ == "__main__":
-    threading.Thread(target=heartbeat_loop, daemon=True).start()
     run_server()
