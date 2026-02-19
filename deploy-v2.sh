@@ -1,26 +1,33 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# TCC Bridge v5.1 — ONE-TAP BULLETPROOF
-set -e
-echo "Starting TCC Bridge v5.1 Installation..."
+# TCC Bridge v7.0 — ONE-TAP PERMANENT SETUP
+# God Builder: Kael
 
-pkg update -y && pkg install -y python git cloudflared termux-api nodejs
+set -e
+echo "🚀 Starting TCC Bridge Bulletproof Setup..."
+
+# Step 1: Packages
+pkg update -y
+pkg install -y python python-pip git nodejs-lts termux-api cronie curl
+
+# Step 2: PM2
 npm install -g pm2
 
-mkdir -p ~/tcc-bridge
-cd ~/tcc-bridge
+# Step 3: Clone/Update Repo
+if [ ! -d "$HOME/tcc-bridge" ]; then
+    git clone https://github.com/Dzongy/tcc-bridge.git "$HOME/tcc-bridge"
+fi
+cd "$HOME/tcc-bridge"
+git pull origin main
 
-# Fetch latest files from GitHub
-curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/bridge.py -o bridge.py
-curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/ecosystem.config.js -o ecosystem.config.js
-curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/state-push.py -o state-push.py
+# Step 4: Boot Script
+mkdir -p "$HOME/.termux/boot"
+cp boot-bridge.sh "$HOME/.termux/boot/boot-bridge.sh"
+chmod +x "$HOME/.termux/boot/boot-bridge.sh"
 
-# Boot setup
-mkdir -p ~/.termux/boot
-curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/boot-bridge.sh -o ~/.termux/boot/boot-bridge
-chmod +x ~/.termux/boot/boot-bridge
-
-# Start everything
+# Step 5: PM2 Setup
 pm2 start ecosystem.config.js
 pm2 save
+pm2 startup
 
-echo "Installation Complete! Bridge is bulletproof."
+echo "✅ Setup Complete! Bridge is now UNKILLABLE."
+echo "Ensure Termux:Boot is installed and 'Acquire Wake Lock' is enabled."
