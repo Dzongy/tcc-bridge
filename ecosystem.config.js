@@ -1,32 +1,33 @@
+
 module.exports = {
   apps: [
     {
-      name: 'bridge',
-      script: 'python3',
-      args: 'bridge.py',
-      restart_delay: 3000,
-      max_restarts: 10,
+      name: "tcc-bridge",
+      script: "python3",
+      args: "bridge.py",
+      autorestart: true,
+      max_memory_restart: "100M",
       env: {
-        BRIDGE_AUTH: 'amos-bridge-2026',
-        BRIDGE_PORT: '8080'
+        BRIDGE_PORT: 8080
       }
     },
     {
-      name: 'cloudflared',
-      script: 'cloudflared',
-      args: 'tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5',
-      restart_delay: 5000
+      name: "tcc-monitor",
+      script: "python3",
+      args: "cloudflared_monitor.py",
+      autorestart: true,
+      env: {
+        HEALTH_URL: "https://zenith.cosmic-claw.com/health",
+        MONITOR_INTERVAL: 60,
+        FAIL_THRESHOLD: 3,
+        PM2_PROCESS: "tcc-tunnel"
+      }
     },
     {
-      name: 'state-push',
-      script: 'python3',
-      args: 'state-push.py',
-      restart_delay: 10000
-    },
-    {
-      name: 'watchdog',
-      script: './watchdog-v2.sh',
-      restart_delay: 10000
+      name: "tcc-tunnel",
+      script: "cloudflared",
+      args: "tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5",
+      autorestart: true
     }
   ]
 };
