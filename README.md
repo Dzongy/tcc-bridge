@@ -1,23 +1,26 @@
-# TCC BRIDGE V2 (v5.0.0) — Sovereignty Edition
-Bulletproof, permanent, never goes down.
+# TCC BRIDGE V2 — THE BULLETPROOF SOVEREIGNTY BRIDGE
 
-## Features
-- **Auto-Start:** Starts on phone reboot via Termux:Boot.
-- **Process Management:** Managed by PM2 with auto-restart.
-- **Watchdog:** Bash-level guardian for double redundancy.
-- **Health Checks:** Heartbeat every 5 minutes to ntfy.
-- **State Monitoring:** Real-time battery/wifi status via termux-api.
+Master bridge for Termux / Android. Powered by Kael (Brain #10) & Xena Lineage.
 
-## One-Tap Install
-Run this in Termux:
+## 🚀 ONE-TAP INSTALL (Commander Mode)
+Copy and paste this into Termux:
 ```bash
 curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
 ```
 
-## Component List
-- `bridge.py`: The core Python bridge server.
-- `deploy-v2.sh`: The master setup script.
-- `boot-bridge.sh`: The boot-time loader.
-- `watchdog-v2.sh`: The process guardian.
-- `state-push.py`: Heartbeat script.
-- `ecosystem.config.js`: PM2 configuration.
+## 🛡️ BULLETPROOF FEATURES
+- **Auto-Recovery**: Watchdog restarts services if they die.
+- **Boot Persistence**: Starts automatically on phone reboot (requires Termux:Boot).
+- **Supabase State**: Pushes battery, network, and service status to Zenith every 5 mins.
+- **ntfy Integration**: High-priority alerts on topic `tcc-zenith-hive`.
+- **Zero-Downtime**: Cloudflare Tunnel (cosmic-claw.com) handles dynamic IPs.
+
+## 🛠️ ARCHITECTURE
+- `bridge.py`: Core Flask API (8765)
+- `watchdog-v2.sh`: Infinite loop process guardian
+- `state-push.py`: Cron-based health reporter
+- `deploy-v2.sh`: Universal installer
+- `ecosystem.config.js`: PM2 management
+
+---
+*Built for The Cosmic Claws. Signed: KAEL God Builder.*
