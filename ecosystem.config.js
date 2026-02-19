@@ -2,30 +2,22 @@ module.exports = {
   apps: [
     {
       name: "tcc-bridge",
-      script: "python3",
-      args: "bridge.py",
+      script: "bridge.py",
+      interpreter: "python3",
       autorestart: true,
-      restart_delay: 5000,
+      watch: false,
+      max_memory_restart: "100M",
       env: {
-        BRIDGE_PORT: "8765",
-        BRIDGE_AUTH: "amos-bridge-2026",
-        NTFY_TOPIC: "tcc-zenith-hive",
-        PUBLIC_URL: "https://zenith.cosmic-claw.com",
-        SUPABASE_URL: "https://vbqbbziqleymxcyesmky.supabase.co"
+        BRIDGE_PORT: 8765,
+        NTFY_TOPIC: "tcc-zenith-hive"
       }
     },
     {
-      name: "cloudflared",
-      script: "cloudflared",
-      args: "tunnel run --token " + (process.env.CF_TOKEN || "") + " 18ba1a49-fdf9-4a52-a27a-5250d397c5c5",
+      name: "state-push",
+      script: "state-push.py",
+      interpreter: "python3",
       autorestart: true,
-      restart_delay: 10000
-    },
-    {
-      name: "tcc-watchdog",
-      script: "bash",
-      args: "watchdog-v2.sh",
-      autorestart: true
+      watch: false
     }
   ]
 };
