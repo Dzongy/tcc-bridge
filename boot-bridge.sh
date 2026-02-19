@@ -1,5 +1,6 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# TCC Boot Script
+#!/bin/bash
+# Termux:Boot script for TCC Bridge
 termux-wake-lock
-pm2 resurrect
-cloudflared tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5 &
+cd ~/tcc-bridge
+pm2 resurrect || pm2 start ecosystem.config.js
+pm2 save
