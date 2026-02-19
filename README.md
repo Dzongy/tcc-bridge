@@ -1,18 +1,24 @@
-# TCC Bridge V2 - Bulletproof Sovereignty
-This repository contains the core bridge infrastructure for Termux-based mobile sovereignty.
+# TCC Bridge V2.5 - Bulletproof Edition
 
-## One-Tap Installation
-Run this command in Termux to install or upgrade everything:
+The robust connection between Commander and the Zenith ecosystem.
+
+## Features
+- **Auto-Healing**: PM2 managed processes with auto-restart.
+- **Health Monitoring**: Periodic checks with ntfy alerts to `tcc-zenith-hive`.
+- **State Push**: Real-time phone telemetry (battery, status) pushed to Supabase.
+- **Persistence**: Termux:Boot integration survives phone reboots.
+- **One-Tap Deployment**: Setup everything with a single command.
+
+## Quick Install (Termux)
 ```bash
 curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
 ```
 
-## Infrastructure Components
-1. **bridge.py**: Python server handling commands and state pushing.
-2. **watchdog-v2.sh**: Infinite loop process guardian.
-3. **boot-bridge.sh**: Termux:Boot compatibility script.
-4. **ecosystem.config.js**: PM2 process management.
+## Architecture
+- **bridge.py**: Main HTTP server (Port 8765)
+- **ecosystem.config.js**: PM2 process manager
+- **boot-bridge.sh**: Boot persistence script
+- **state-push.py**: (Legacy/Reference) - Logic integrated into bridge.py
 
-## Monitoring
-Check health at: https://zenith.cosmic-claw.com/health
-Real-time alerts via ntfy topic: `tcc-zenith-hive`
+---
+*Built by KAEL God Builder for The Cosmic Claws.*
