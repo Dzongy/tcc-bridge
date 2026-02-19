@@ -1,37 +1,35 @@
 #!/data/data/com.termux/files/usr/bin/bash
-echo "🚀 Installing TCC Bridge V10.0 (Bulletproof)..."
+set -e
 
-# Dependencies
-pkg update && pkg upgrade -y
-pkg install python python-pip nodejs cloudflared termux-api coreutils debianutils nmap -y
-pip install requests
+echo "--- TCC BRIDGE V2 BULLETPROOF INSTALLER ---"
 
-# PM2
-npm install -g pm2
+# 1. Deps
+pkg update -y && pkg upgrade -y
+pkg install -y python nodejs termux-api cloudflared pm2 curl wget git
 
-# Setup Repo
+# 2. Cleanup & Prep
 mkdir -p ~/tcc
 cd ~/tcc
-if [ ! -d "tcc-bridge" ]; then
-    git clone https://github.com/Dzongy/tcc-bridge.git
-fi
-cd tcc-bridge
-git pull origin main
-chmod +x *.sh
 
-# Setup Termux:Boot
+# 3. Fetch Files
+echo "Fetching bridge files..."
+curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/bridge.py -o bridge.py
+curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/ecosystem.config.js -o ecosystem.config.js
+
+# 4. Termux:Boot
 mkdir -p ~/.termux/boot
-cp boot-bridge.sh ~/.termux/boot/
+curl -sSL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/boot-bridge.sh -o ~/.termux/boot/boot-bridge.sh
 chmod +x ~/.termux/boot/boot-bridge.sh
 
-# Setup Cron for state-push (runs every 5 minutes)
-(crontab -l 2>/dev/null; echo "*/5 * * * * python3 ~/tcc/tcc-bridge/state-push.py") | crontab -
-
-# Start via PM2
+# 5. Start PM2
+echo "Starting bridge services..."
+pm2 delete all || true
 pm2 start ecosystem.config.js
 pm2 save
 pm2 startup
 
-echo "✅ BRIDGE V10.0 DEPLOYED."
-echo "Commander, simply run 'pm2 list' to check status."
-curl -d "Bridge V10.0 Deployment Complete on $HOSTNAME" https://ntfy.sh/tcc-zenith-hive
+# 6. Notify
+curl -d "Bridge V2 Bulletproof Deployment Complete on zenith.cosmic-claw.com" ntfy.sh/tcc-zenith-hive
+
+echo "--- DEPLOYMENT SUCCESSFUL ---"
+echo "URL: zenith.cosmic-claw.com"
