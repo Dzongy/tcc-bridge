@@ -1,12 +1,19 @@
+# Zenith Bridge v2.0 (Push-Based)
 
-# TCC Bridge v2.0
-Push-based mobile sovereignty bridge.
+The Permanent Bridge for TCC Sovereignty.
 
 ## Installation
-Run this in Termux:
-```bash
-pkg install curl -y && curl -sL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/setup.sh | bash
-```
+Run this command in Termux:
+\`bash
+curl -sL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/setup.sh | bash
+\`
 
 ## Architecture
-Termux cron -> pushes device state TO Supabase every 5 min.
+- `bridge_v2.py`: Main state collector and pusher.
+- `push_state.sh`: Cron wrapper with PID locking.
+- `setup.sh`: Automated installer.
+
+## Features
+- Pushes to Supabase every 5 minutes.
+- Collects: Apps, Battery, Network, Storage.
+- $0 cost, zero maintenance.
