@@ -1,4 +1,4 @@
-// ecosystem.config.js â TCC Bridge V2 PM2 Process Manager Configuration
+// ecosystem.config.js — TCC Bridge V3 PM2 Process Manager Configuration
 // Place at: ~/tcc-bridge/ecosystem.config.js
 // Usage:  pm2 start ecosystem.config.js
 //         pm2 reload ecosystem.config.js --update-env
@@ -11,7 +11,7 @@ const TUNNEL_UUID = '18ba1a49-fdf9-4a52-a27a-5250d397c5c5';
 
 module.exports = {
   apps: [
-    // ââ 1. TCC Bridge API (bridge.py) ââââââââââââââââââââââââââââââââââââââââ
+    // ── 1. TCC Bridge API (bridge.py) ──────────────────────────────────────
     {
       name: 'tcc-bridge',
       script: `${BRIDGE_DIR}/bridge.py`,
@@ -21,8 +21,8 @@ module.exports = {
       // Restart behaviour
       autorestart: true,
       watch: false,
-      max_restarts: 20,
-      restart_delay: 3000,    // ms â wait 3 s before restart
+      max_restarts: 100,
+      restart_delay: 3000,
       exp_backoff_restart_delay: 100,
 
       // Logging
@@ -31,15 +31,19 @@ module.exports = {
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
 
-      // Environment
+      // Environment — CORRECTED PORT AND SUPABASE
       env: {
         PYTHONUNBUFFERED: '1',
-        BRIDGE_PORT: '8080',
+        BRIDGE_PORT: '8765',
+        SUPABASE_URL: 'https://vbqbbziqleymxcyesmky.supabase.co',
+        SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZicWJiemlxbGV5bXhjeWVzbWt5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTExMTUxNiwiZXhwIjoyMDg2Njg3NTE2fQ.MREdeLv0R__fHe61lOYSconedoo_qHItZUpmcR-IORQ',
+        BRIDGE_AUTH: 'amos-bridge-2026',
+        PUBLIC_URL: 'zenith.cosmic-claw.com',
         NODE_ENV: 'production',
       },
     },
 
-    // ââ 2. State Push Worker (state-push.py) âââââââââââââââââââââââââââââââââ
+    // ── 2. State Push Worker (state-push.py) ───────────────────────────────
     {
       name: 'tcc-state-push',
       script: `${BRIDGE_DIR}/state-push.py`,
@@ -48,9 +52,8 @@ module.exports = {
 
       autorestart: true,
       watch: false,
-      max_restarts: 20,
+      max_restarts: 50,
       restart_delay: 5000,
-      exp_backoff_restart_delay: 100,
 
       out_file: `${LOG_DIR}/state-push-out.log`,
       error_file: `${LOG_DIR}/state-push-err.log`,
@@ -59,33 +62,46 @@ module.exports = {
 
       env: {
         PYTHONUNBUFFERED: '1',
-        NODE_ENV: 'production',
+        SUPABASE_URL: 'https://vbqbbziqleymxcyesmky.supabase.co',
+        SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZicWJiemlxbGV5bXhjeWVzbWt5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTExMTUxNiwiZXhwIjoyMDg2Njg3NTE2fQ.MREdeLv0R__fHe61lOYSconedoo_qHItZUpmcR-IORQ',
       },
     },
 
-    // ââ 3. Cloudflare Tunnel (cloudflared) âââââââââââââââââââââââââââââââââââ
+    // ── 3. Cloudflare Tunnel ───────────────────────────────────────────────
     {
       name: 'tcc-cloudflared',
       script: 'cloudflared',
-      args: `tunnel run ${TUNNEL_UUID}`,
-      interpreter: 'none',   // binary, not a script interpreter
+      args: `tunnel --no-autoupdate run --token ${process.env.CF_TOKEN || ''}`,
+      interpreter: 'none',
       cwd: BRIDGE_DIR,
 
       autorestart: true,
       watch: false,
-      max_restarts: 50,        // tunnels should be very resilient
-      restart_delay: 2000,
-      exp_backoff_restart_delay: 100,
-      min_uptime: '10s',       // must stay up 10 s to count as healthy
+      max_restarts: 50,
+      restart_delay: 5000,
 
-      out_file: `${LOG_DIR}/cloudflared-out.log`,
-      error_file: `${LOG_DIR}/cloudflared-err.log`,
+      out_file: `${LOG_DIR}/tunnel-out.log`,
+      error_file: `${LOG_DIR}/tunnel-err.log`,
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
+    },
 
-      env: {
-        NODE_ENV: 'production',
-      },
+    // ── 4. Watchdog ────────────────────────────────────────────────────────
+    {
+      name: 'tcc-watchdog',
+      script: `${BRIDGE_DIR}/watchdog.sh`,
+      interpreter: 'bash',
+      cwd: BRIDGE_DIR,
+
+      autorestart: true,
+      watch: false,
+      max_restarts: 10,
+      restart_delay: 10000,
+
+      out_file: `${LOG_DIR}/watchdog-out.log`,
+      error_file: `${LOG_DIR}/watchdog-err.log`,
+      merge_logs: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
   ],
 };
