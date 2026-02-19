@@ -1,20 +1,25 @@
 module.exports = {
   apps: [
     {
-      name: "tcc-bridge",
-      script: "python3 bridge.py",
+      name: 'bridge',
+      script: 'bridge.py',
+      interpreter: 'python3',
       restart_delay: 5000,
-      env: { PYTHONUNBUFFERED: "1" }
+      env: {
+        BRIDGE_PORT: '8080',
+        BRIDGE_AUTH: 'amos-bridge-2026'
+      }
     },
     {
-      name: "tcc-tunnel",
-      script: "cloudflared tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5",
-      restart_delay: 5000
-    },
-    {
-      name: "tcc-monitor",
-      script: "python3 monitor.py",
+      name: 'state-push',
+      script: 'state-push.py',
+      interpreter: 'python3',
       restart_delay: 10000
+    },
+    {
+      name: 'watchdog',
+      script: 'watchdog-v2.sh',
+      interpreter: 'bash'
     }
   ]
-}
+};
