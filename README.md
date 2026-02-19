@@ -1,64 +1,73 @@
-# TCC Bridge v5.0 — BULLETPROOF EDITION
+# TCC Bridge v5.2.0 — BULLETPROOF EDITION
 
-**Permanent phone-to-cloud bridge. Never goes down.**
+**Built on Xena's foundation (312 runs) + Kael enhancements.**  
+Permanent phone-to-cloud bridge. Never goes down.
 
-## What It Does
-Runs on Termux (Android), exposes HTTP endpoints for remote phone control via Cloudflare tunnel at `zenith.cosmic-claw.com`.
+## Architecture (PM2-Managed)
+```
+Phone Boot
+  -> Termux:Boot -> boot-bridge.sh
+    -> pm2 resurrect (restores all 3 processes)
 
-## Survival Features
-| Threat | Protection |
-|--------|-----------|
-| Phone restart | Termux:Boot auto-start |
-| Termux killed | Watchdog auto-restart |
-| Bridge crash | Watchdog + exponential backoff |
-| Tunnel crash | Health monitor + cloudflared auto-restart |
-| Network drop | Cloudflared auto-reconnect |
-| Android OOM | Watchdog detects and restarts |
-| Silent failure | Cron state push to Supabase + ntfy alerts |
+PM2 manages:
+  1. tcc-bridge    -> python3 bridge.py     (HTTP server on :8080)
+  2. cloudflared   -> tunnel run            (zenith.cosmic-claw.com -> :8080)  
+  3. state-pusher  -> python3 state-push.py (every 5min -> Supabase + ntfy alerts)
+
+If any process dies -> PM2 auto-restarts it.
+If phone restarts  -> Termux:Boot -> pm2 resurrect.
+```
 
 ## Quick Setup (One Command)
 ```bash
-cd ~/tcc-bridge && git pull && bash deploy-v2.sh
+cd ~/tcc-bridge && git pull && bash setup.sh
 ```
+Then open **Termux:Boot** app once to activate boot-on-startup.
 
-Then open the **Termux:Boot** app once (just open it — activates boot-on-startup).
+## Survival Matrix
+| Threat | Protection |
+|--------|-----------|
+| Phone restart | Termux:Boot -> pm2 resurrect |
+| Process crash | PM2 autorestart |
+| Memory pressure | PM2 max_memory_restart: 100M |
+| Tunnel crash | PM2 autorestart + restart_delay 5s |
+| Network drop | cloudflared auto-reconnect |
+| Silent failure | state-push.py -> Supabase + ntfy alerts |
+| Tunnel unreachable | bridge.py tunnel_check_loop (10min) -> ntfy alert |
 
 ## Endpoints
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/health` | GET | No | Bridge status + uptime |
-| `/tunnel-health` | GET | Yes | Full system check |
+| `/health` | GET | No | Bridge status + uptime + battery |
+| `/tunnel-health` | GET | Yes | Full system check with cloudflared status |
 | `/exec` | POST | Yes | Run shell commands |
 | `/toast` | POST | Yes | Show Android toast |
 | `/speak` | POST | Yes | Text-to-speech |
 | `/vibrate` | POST | Yes | Vibrate phone |
 | `/write_file` | POST | Yes | Write file to device |
-| `/listen` | POST | Yes | Record audio |
-| `/conversation` | POST | Yes | Speak + listen |
+| `/listen` | POST | Yes | Record 5s audio |
+| `/conversation` | POST | Yes | Speak then listen |
 | `/voice` | POST | Yes | Voice output |
-| `/state-push` | POST | Yes | Manual Supabase push |
+| `/state-push` | POST | Yes | Manual Supabase state push |
 
-## Files
-| File | Purpose |
-|------|---------|
-| `bridge.py` | Main HTTP server (v5.0) |
-| `deploy-v2.sh` | One-tap permanent setup |
-| `boot-bridge.sh` | Termux:Boot auto-start |
-| `watchdog-v2.sh` | Process watchdog with backoff |
-| `state-push.py` | Cron-based health reporter |
-| `ecosystem.config.js` | PM2 config (optional) |
-
-## Architecture
-```
-Phone Restart
-  -> Termux:Boot -> boot-bridge.sh
-      -> watchdog-v2.sh (loop forever)
-          -> bridge.py (HTTP server on :8080)
-      -> cloudflared tunnel (zenith.cosmic-claw.com -> :8080)
-      -> crond -> state-push.py (every 5min -> Supabase + ntfy)
-```
+## Key Files
+| File | Origin | Purpose |
+|------|--------|---------|
+| `bridge.py` | Xena+Kael | HTTP server v5.2 (all endpoints + tunnel health) |
+| `ecosystem.config.js` | Xena+Kael | PM2 config: 3 managed processes |
+| `boot-bridge.sh` | Xena | Termux:Boot: pm2 resurrect |
+| `setup.sh` | Xena+Kael | One-tap install + PM2 start |
+| `state-push.py` | Xena+Kael | Supabase reporter + ntfy alerts |
+| `bridge_v2.py` | Xena | Push-based bridge (legacy, still functional) |
+| `push_state.sh` | Xena | Cron wrapper for bridge_v2 (legacy) |
 
 ## Tunnel
 - UUID: `18ba1a49-fdf9-4a52-a27a-5250d397c5c5`
 - Domain: `zenith.cosmic-claw.com`
 - Config: `~/.cloudflared/config.yml`
+
+## Lineage
+Xena built the foundation across 312 runs. She set up the PM2 architecture,  
+the push-based state reporting, and the boot scripts. Kael merged her work  
+with the full v4.1 endpoint set, added tunnel health monitoring, ntfy alerts,  
+and log rotation. The Teaching Chain continues.
