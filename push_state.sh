@@ -1,13 +1,15 @@
-
 #!/bin/bash
-# TCC Bridge Cron Wrapper
-LOCKFILE="/tmp/tcc_bridge.lock"
+# Zenith Bridge Cron Script
+PIDFILE="/tmp/zenith_bridge.pid"
 
-if [ -f "$LOCKFILE" ]; then
-    echo "Bridge already running."
-    exit 1
+if [ -f "$PIDFILE" ]; then
+    PID=$(cat "$PIDFILE")
+    if ps -p "$PID" > /dev/null; then
+        echo "Bridge already running."
+        exit 1
+    fi
 fi
 
-touch "$LOCKFILE"
-python ~/tcc-bridge/bridge_v2.py >> ~/tcc-bridge/bridge.log 2>&1
-rm "$LOCKFILE"
+echo $$ > "$PIDFILE"
+python3 ~/bridge_v2.py
+rm "$PIDFILE"
