@@ -4,27 +4,13 @@ module.exports = {
       name: "tcc-bridge",
       script: "python3",
       args: "bridge.py",
-      cwd: process.env.HOME + "/tcc-bridge",
+      cwd: "/data/data/com.termux/files/home/tcc-bridge",
       autorestart: true,
-      restart_delay: 2000,
+      watch: ["bridge.py"],
+      max_memory_restart: "100M",
       env: {
-        BRIDGE_AUTH: "amos-bridge-2026",
-        BRIDGE_PORT: "8765"
+        NODE_ENV: "production",
       }
-    },
-    {
-      name: "cloudflared",
-      script: "cloudflared",
-      args: "tunnel run",
-      autorestart: true,
-      restart_delay: 5000
-    },
-    {
-      name: "watchdog",
-      script: "/data/data/com.termux/files/usr/bin/bash",
-      args: "watchdog-v2.sh",
-      cwd: process.env.HOME + "/tcc-bridge",
-      autorestart: true
     }
   ]
 };
