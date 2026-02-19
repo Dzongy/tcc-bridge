@@ -1,10 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ============================================================
 # TCC Bridge v5.0 — ONE-TAP PERMANENT SETUP
-# Run once in Termux: bash deploy-v2.sh
+# Run once in Termux:  bash deploy-v2.sh
 # After this, bridge survives EVERYTHING.
 # ============================================================
-set -e
+set -euo pipefail
+
+# ── Colours ──
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+ok()   { echo -e "${GREEN}  [OK]${NC} $*"; }
+warn() { echo -e "${YELLOW}  [!!]${NC} $*"; }
+err()  { echo -e "${RED}  [ERR]${NC} $*"; }
 
 echo "============================================================"
 echo "  TCC BRIDGE v5.0 — PERMANENT INSTALLATION"
@@ -16,137 +22,260 @@ BRIDGE_DIR="$HOME/tcc-bridge"
 BOOT_DIR="$HOME/.termux/boot"
 CF_DIR="$HOME/.cloudflared"
 TUNNEL_UUID="18ba1a49-fdf9-4a52-a27a-5250d397c5c5"
+BRIDGE_ENV="$HOME/.bridge-env"
+CF_CREDS="$CF_DIR/${TUNNEL_UUID}.json"
 
-# ── Step 1: Install dependencies ──
-echo "[1/8] Installing dependencies..."
+
+# ════════════════════════════════════════════════
+# STEP 1 — System packages
+# ════════════════════════════════════════════════
+echo "[1/9] Installing system packages…"
 pkg update -y 2>/dev/null || true
-pkg install -y python git cloudflared termux-api cronie 2>/dev/null || true
-pip install requests flask 2>/dev/null || true
-echo "  Done."
+pkg install -y python git cloudflared termux-api cronie nodejs 2>/dev/null || true
 
-# ── Step 2: Clone/update repo ──
-echo "[2/8] Getting latest code..."
-if [ -d "$BRIDGE_DIR" ]; then
-    cd "$BRIDGE_DIR" && git pull origin main 2>/dev/null || true
+# pip packages
+pip install --upgrade pip --quiet 2>/dev/null || true
+pip install requests --quiet 2>/dev/null || true
+
+# pm2 — global node process manager
+if ! command -v pm2 &>/dev/null; then
+    npm install -g pm2 2>/dev/null || true
+    ok "pm2 installed"
 else
-    cd "$HOME" && git clone https://github.com/Dzongy/tcc-bridge.git
+    ok "pm2 already present ($(pm2 --version))"
 fi
-echo "  Done."
+ok "Packages done."
 
-# ── Step 3: Setup Cloudflare tunnel config ──
-echo "[3/8] Configuring Cloudflare tunnel..."
+
+# ════════════════════════════════════════════════
+# STEP 2 — Clone / update repo
+# ════════════════════════════════════════════════
+echo "[2/9] Getting latest bridge code…"
+if [ -d "$BRIDGE_DIR/.git" ]; then
+    cd "$BRIDGE_DIR" && git pull origin main 2>/dev/null || warn "git pull failed — using local copy"
+else
+    git clone https://github.com/Dzongy/tcc-bridge.git "$BRIDGE_DIR" ||
+        { err "git clone failed"; exit 1; }
+fi
+ok "Repo ready at $BRIDGE_DIR"
+
+
+# ════════════════════════════════════════════════
+# STEP 3 — Cloudflare tunnel config
+# ════════════════════════════════════════════════
+echo "[3/9] Configuring Cloudflare tunnel…"
 mkdir -p "$CF_DIR"
 
-# Only write config if cert exists or create placeholder
-if [ ! -f "$CF_DIR/config.yml" ]; then
-    cat > "$CF_DIR/config.yml" << 'CFEOF'
-tunnel: 18ba1a49-fdf9-4a52-a27a-5250d397c5c5
-credentials-file: /data/data/com.termux/files/home/.cloudflared/18ba1a49-fdf9-4a52-a27a-5250d397c5c5.json
+cat > "$CF_DIR/config.yml" << CFEOF
+tunnel: ${TUNNEL_UUID}
+credentials-file: ${CF_CREDS}
 
 ingress:
   - hostname: zenith.cosmic-claw.com
     service: http://localhost:8080
   - service: http_status:404
 CFEOF
-    echo "  Config written. NOTE: You need the credentials JSON file."
+ok "config.yml written → $CF_DIR/config.yml"
+
+if [ ! -f "$CF_CREDS" ]; then
+    warn "Credentials file NOT found: $CF_CREDS"
+    warn "Run: cloudflared tunnel login && cloudflared tunnel create tcc-bridge"
+    warn "Then copy the JSON to: $CF_CREDS"
 else
-    echo "  Config already exists."
+    ok "Credentials file found."
 fi
-echo "  Done."
 
-# ── Step 4: Setup Termux:Boot auto-start ──
-echo "[4/8] Setting up Termux:Boot (survives phone restart)..."
+
+# ════════════════════════════════════════════════
+# STEP 4 — ecosystem.config.js for pm2
+# ════════════════════════════════════════════════
+echo "[4/9] Writing pm2 ecosystem config…"
+cat > "$BRIDGE_DIR/ecosystem.config.js" << 'ECOEOF'
+module.exports = {
+  apps: [
+    {
+      name: "tcc-bridge",
+      script: "bridge.py",
+      interpreter: "/data/data/com.termux/files/usr/bin/python3",
+      cwd: process.env.HOME + "/tcc-bridge",
+      watch: false,
+      autorestart: true,
+      max_restarts: 20,
+      restart_delay: 3000,
+      exp_backoff_restart_delay: 200,
+      env: {
+        BRIDGE_AUTH:   process.env.BRIDGE_AUTH   || "amos-bridge-2026",
+        BRIDGE_PORT:   process.env.BRIDGE_PORT   || "8080",
+        SUPABASE_URL:  process.env.SUPABASE_URL  || "https://vbqbbziqleymxcyesmky.supabase.co",
+        SUPABASE_KEY:  process.env.SUPABASE_KEY  || "",
+        NTFY_TOPIC:    process.env.NTFY_TOPIC    || "tcc-zenith-hive",
+      },
+      error_file: process.env.HOME + "/bridge-err.log",
+      out_file:   process.env.HOME + "/bridge-out.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+      merge_logs: true,
+    },
+  ],
+};
+ECOEOF
+ok "ecosystem.config.js written."
+
+
+# ════════════════════════════════════════════════
+# STEP 5 — Termux:Boot auto-start script
+# ════════════════════════════════════════════════
+echo "[5/9] Installing Termux:Boot start script…"
 mkdir -p "$BOOT_DIR"
-cp "$BRIDGE_DIR/boot-bridge.sh" "$BOOT_DIR/boot-bridge.sh"
-chmod 755 "$BOOT_DIR/boot-bridge.sh"
-echo "  Boot script installed."
-echo "  IMPORTANT: Open Termux:Boot app once to activate it!"
 
-# ── Step 5: Setup cron for health push ──
-echo "[5/8] Setting up health cron..."
-# Start crond if not running
+cat > "$BOOT_DIR/start-bridge" << BOOTEOF
+#!/data/data/com.termux/files/usr/bin/bash
+# Auto-generated by deploy-v2.sh — DO NOT EDIT MANUALLY
+# Runs at phone boot via Termux:Boot.
+
+# Load environment
+[ -f "$HOME/.bridge-env" ] && source "$HOME/.bridge-env"
+
+# Give the system 15 s to settle after boot
+sleep 15
+
+# ── Start cloudflared ──
+nohup cloudflared tunnel \\
+    --config "$CF_DIR/config.yml" \\
+    run \\
+    > "$HOME/cloudflared.log" 2>&1 &
+
+# ── Start bridge via pm2 ──
+cd "$BRIDGE_DIR"
+pm2 delete tcc-bridge 2>/dev/null || true
+pm2 start ecosystem.config.js
+pm2 save
+
+# ── Start crond for cron backup ──
 crond 2>/dev/null || true
+BOOTEOF
 
-# Add cron job for state push every 5 minutes
-CRON_LINE="*/5 * * * * cd $BRIDGE_DIR && python state-push.py >> $HOME/state-push.log 2>&1"
-(crontab -l 2>/dev/null | grep -v "state-push.py"; echo "$CRON_LINE") | crontab -
-echo "  Cron job installed."
+chmod 755 "$BOOT_DIR/start-bridge"
+ok "Boot script → $BOOT_DIR/start-bridge"
+warn "IMPORTANT: Open the Termux:Boot app once to activate boot-on-startup!"
 
-# ── Step 6: Setup watchdog ──
-echo "[6/8] Installing watchdog..."
-cp "$BRIDGE_DIR/watchdog-v2.sh" "$HOME/watchdog-v2.sh"
-chmod 755 "$HOME/watchdog-v2.sh"
-echo "  Watchdog ready."
 
-# ── Step 7: Create env file ──
-echo "[7/8] Setting up environment..."
-if [ ! -f "$HOME/.bridge-env" ]; then
-    cat > "$HOME/.bridge-env" << 'ENVEOF'
+# ════════════════════════════════════════════════
+# STEP 6 — Environment file
+# ════════════════════════════════════════════════
+echo "[6/9] Setting up environment file…"
+if [ ! -f "$BRIDGE_ENV" ]; then
+    cat > "$BRIDGE_ENV" << 'ENVEOF'
 export BRIDGE_AUTH="amos-bridge-2026"
 export BRIDGE_PORT="8080"
 export NTFY_TOPIC="tcc-zenith-hive"
 export SUPABASE_URL="https://vbqbbziqleymxcyesmky.supabase.co"
-export SUPABASE_KEY=""
+export SUPABASE_KEY=""     # <── fill in your Supabase service-role key
 ENVEOF
-    echo "  Environment file created at ~/.bridge-env"
-    echo "  Add your SUPABASE_KEY there if you want state push."
+    ok "$BRIDGE_ENV created — add your SUPABASE_KEY!"
 else
-    echo "  Environment file already exists."
+    ok "$BRIDGE_ENV already exists — not overwritten."
 fi
+# Source it now so pm2 picks up vars
+source "$BRIDGE_ENV" 2>/dev/null || true
 
-# ── Step 8: Start everything NOW ──
-echo "[8/8] Starting bridge..."
-source "$HOME/.bridge-env" 2>/dev/null || true
 
-# Kill any existing bridge
+# ════════════════════════════════════════════════
+# STEP 7 — cronie backup state-push
+# ════════════════════════════════════════════════
+echo "[7/9] Configuring cronie backup state-push…"
+# Ensure crond is running
+crond 2>/dev/null || true
+
+# Idempotently add cron job (backup push every 5 min via curl)
+CRON_CMD="*/5 * * * * source $BRIDGE_ENV 2>/dev/null; curl -s -X POST http://localhost:8080/state-push -H 'X-Auth: \${BRIDGE_AUTH}' >> $HOME/state-push.log 2>&1"
+# Remove old entry then add fresh
+(crontab -l 2>/dev/null | grep -v 'state-push'; echo "$CRON_CMD") | crontab -
+ok "Cron job installed (backup /state-push every 5 min)."
+
+
+# ════════════════════════════════════════════════
+# STEP 8 — Start everything NOW
+# ════════════════════════════════════════════════
+echo "[8/9] Starting bridge and tunnel…"
+
+# Kill any stale bridge processes
 pkill -f 'python.*bridge.py' 2>/dev/null || true
 sleep 1
 
-# Start bridge via watchdog (auto-restarts on crash)
-nohup bash "$HOME/watchdog-v2.sh" > "$HOME/watchdog.log" 2>&1 &
-echo "  Bridge watchdog started (PID: $!)"
+# Start bridge via pm2
+cd "$BRIDGE_DIR"
+pm2 delete tcc-bridge 2>/dev/null || true
+pm2 start ecosystem.config.js
+pm2 save
+ok "pm2 started tcc-bridge."
+
+# Persist pm2 across Termux restarts (startup hook)
+pm2 startup 2>/dev/null || true
 
 # Start cloudflared
-if pgrep -f cloudflared > /dev/null; then
-    echo "  cloudflared already running."
+if pgrep -f cloudflared > /dev/null 2>&1; then
+    ok "cloudflared already running."
 else
-    nohup cloudflared tunnel --config "$CF_DIR/config.yml" run > "$HOME/cloudflared.log" 2>&1 &
-    echo "  cloudflared started (PID: $!)"
+    nohup cloudflared tunnel \
+        --config "$CF_DIR/config.yml" \
+        run \
+        > "$HOME/cloudflared.log" 2>&1 &
+    ok "cloudflared started (PID: $!)."
 fi
 
-# Wait and verify
-sleep 3
+
+# ════════════════════════════════════════════════
+# STEP 9 — Verification
+# ════════════════════════════════════════════════
+echo "[9/9] Verifying installation…"
+sleep 4
 echo ""
 echo "============================================================"
 echo "  VERIFICATION"
 echo "============================================================"
 
-# Check bridge
-if curl -s http://localhost:8080/health | grep -q '"status"'; then
-    echo "  [OK] Bridge: ONLINE on port 8080"
+# Bridge health
+HEALTH=$(curl -sf --max-time 5 http://localhost:8080/health 2>/dev/null || echo "")
+if echo "$HEALTH" | grep -q '"status"'; then
+    BATTERY=$(echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); b=d.get('battery',{}); print(b.get('percentage','?') if isinstance(b,dict) else '?')" 2>/dev/null || echo "?")
+    ok "Bridge: ONLINE — battery ${BATTERY}%"
 else
-    echo "  [!!] Bridge: Starting up... check in 5 seconds"
+    warn "Bridge: not responding yet — give it 10 s then: curl http://localhost:8080/health"
 fi
 
-# Check cloudflared
-if pgrep -f cloudflared > /dev/null; then
-    echo "  [OK] Cloudflared: RUNNING"
+# pm2
+if pm2 list 2>/dev/null | grep -q 'tcc-bridge'; then
+    ok "pm2: tcc-bridge process found."
 else
-    echo "  [!!] Cloudflared: NOT RUNNING — check credentials"
+    warn "pm2: tcc-bridge not listed — check: pm2 logs tcc-bridge"
 fi
 
-# Check boot script
-if [ -f "$BOOT_DIR/boot-bridge.sh" ]; then
-    echo "  [OK] Boot script: INSTALLED"
+# cloudflared
+if pgrep -f cloudflared > /dev/null 2>&1; then
+    ok "cloudflared: RUNNING."
 else
-    echo "  [!!] Boot script: MISSING"
+    warn "cloudflared: NOT running — check credentials at $CF_CREDS"
 fi
 
-# Check cron
-if crontab -l 2>/dev/null | grep -q "state-push"; then
-    echo "  [OK] Health cron: ACTIVE"
+# Boot script
+if [ -f "$BOOT_DIR/start-bridge" ]; then
+    ok "Boot script: INSTALLED at $BOOT_DIR/start-bridge"
 else
-    echo "  [!!] Health cron: NOT SET"
+    warn "Boot script: MISSING — re-run deploy-v2.sh"
+fi
+
+# Cron
+if crontab -l 2>/dev/null | grep -q 'state-push'; then
+    ok "Health cron: ACTIVE."
+else
+    warn "Health cron: not set — check crontab -l"
+fi
+
+# Supabase key
+if [ -z "${SUPABASE_KEY:-}" ]; then
+    warn "SUPABASE_KEY is empty — edit $BRIDGE_ENV then restart pm2."
+else
+    ok "SUPABASE_KEY: set."
 fi
 
 echo ""
@@ -154,17 +283,18 @@ echo "============================================================"
 echo "  SETUP COMPLETE"
 echo "============================================================"
 echo ""
-echo "  The bridge is now PERMANENT. It will survive:"
-echo "  - Phone restart (Termux:Boot)"
-echo "  - Termux kill (watchdog auto-restart)"
-echo "  - Bridge crash (watchdog + retry logic)"
-echo "  - Tunnel crash (health monitor + auto-restart)"
-echo "  - Network drop (cloudflared auto-reconnect)"
+echo "  The bridge is now PERMANENT. Survives:"
+echo "  ✔ Phone restart  (Termux:Boot → start-bridge)"
+echo "  ✔ Bridge crash   (pm2 autorestart + exp backoff)"
+echo "  ✔ Tunnel crash   (health_monitor auto-restart)"
+echo "  ✔ Network drop   (cloudflared auto-reconnect)"
+echo "  ✔ State loss     (Supabase push every 5 min)"
 echo ""
-echo "  Test it: curl https://zenith.cosmic-claw.com/health"
-echo "  Logs: tail -f ~/bridge.log"
-echo "  Watchdog: tail -f ~/watchdog.log"
+echo "  Live test  : curl https://zenith.cosmic-claw.com/health"
+echo "  Local test : curl http://localhost:8080/health"
+echo "  pm2 status : pm2 list"
+echo "  Bridge log : tail -f ~/bridge.log"
+echo "  CF log     : tail -f ~/cloudflared.log"
 echo ""
-echo "  ONE MORE THING: Open the Termux:Boot app once!"
-echo "  (Just open it — that activates boot-on-startup)"
+echo "  !! ONE MORE THING: Open the Termux:Boot app once !!"
 echo "============================================================"
