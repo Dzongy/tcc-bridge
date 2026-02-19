@@ -1,20 +1,16 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# watchdog-v2.sh - Infinite vigilance
+#!/bin/bash
+# TCC Bridge Watchdog v2.0
+# Monitors tunnel and bridge health, alerts ntfy on failure
+
+NTFY_TOPIC="tcc-zenith-hive"
+HEALTH_URL="https://zenith.cosmic-claw.com/health"
+
 while true; do
-  # Check Bridge
-  if ! curl -s localhost:8765/health | grep -q "ok"; then
-    echo "Bridge offline. Restarting..."
-    pm2 restart bridge || pm2 start $HOME/tcc-bridge/bridge.py --name bridge
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
+  if [ "$STATUS" != "200" ]; then
+    echo "Bridge health check failed: $STATUS"
+    curl -d "â ï¸ TCC Bridge Health Check FAILED (Status: $STATUS). Attempting recovery..." "https://ntfy.sh/$NTFY_TOPIC"
+    pm2 restart all
   fi
-  
-  # Check Cloudflared
-  if ! pm2 status cloudflared | grep -q "online"; then
-    echo "Cloudflared offline. Restarting..."
-    pm2 restart cloudflared
-  fi
-  
-  # Push state every 10 min (600s)
-  python3 $HOME/tcc-bridge/state-push.py
-  
-  sleep 60
+  sleep 300
 done
