@@ -1,51 +1,29 @@
-#!/data/data/com.termux/files/usr/bin/sh
-# TCC Bridge v2.0 Setup
-# One-command installer
-
+#!/data/data/com.termux/files/usr/bin/bash
+# BRIDGE V2 ONE-TAP SETUP
 set -e
+echo "Starting Bulletproof Bridge V2 Setup..."
 
-PROJECT_DIR="/data/data/com.termux/files/home/tcc"
-LOG_DIR="${PROJECT_DIR}/.bridge"
+pkg update -y && pkg upgrade -y
+pkg install -y python nodejs termux-api git cloudflared cronie
+npm install -g pm2
 
-echo "== TCC Bridge v2.0 Setup =="
-echo ""
-
-# Create directory
-mkdir -p "${PROJECT_DIR}"
-mkdir -p "$LOG_DIR"
-
-# Install dependencies
-echo "[1] Installing dependencies..."
-pip3 install requests -q
-
-# Download files
-echo "[2] Downloading bridge files..."
-curl -sS "https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/bridge_v2.py" -o "${PROJECT_DIR}/bridge_v2.py"
-curl -sS "https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/push_state.sh" -o "${PROJECT_DIR}/push_state.sh"
-curl -sS "https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/bridge.py" -o "${PROJECT_DIR}/bridge.py"
-
-chmod +x "${PROJECT_DIR}/push_state.sh"
-
-# Setup cron job
-echo "[3] Setting up cron job..."
-echo "* * * * * ${PROJECT_DIR}/push_state.sh" | crontab -
-
-# Test connectivity
-echo "[4] Testing connectivity..."
-cd "$PROJECT_DIR"
-python3 bridge_v2.py --once
-if [ $? -eq 0 ]; then
-    echo "[OK] Bridge connected successfully!"
+# Clone or update repo
+if [ -d "$HOME/tcc-bridge" ]; then
+    cd "$HOME/tcc-bridge" && git pull
 else
-    echo "[WARN] Bridge test failed. Check configuration."
+    git clone https://github.com/Dzongy/tcc-bridge.git "$HOME/tcc-bridge"
+    cd "$HOME/tcc-bridge"
 fi
 
-# Start crond
-echo "[5] Starting crond daemon..."
-crond
+# Set up Termux:Boot
+mkdir -p "$HOME/.termux/boot"
+cp boot-bridge.sh "$HOME/.termux/boot/"
+chmod +x "$HOME/.termux/boot/boot-bridge.sh"
 
-echo ""
-echo "== Setup Complete =="
-echo "Bridge will push state every 5 minutes."
-echo "Logs: ${LOG_DIR}/bridge.log"
-echo ""
+# Start with PM2
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
+
+echo "SETUP COMPLETE. Bridge is running via PM2."
+echo "Check status with: pm2 status"
