@@ -1,26 +1,33 @@
-
 module.exports = {
   apps: [
     {
       name: "tcc-bridge",
       script: "python3",
-      args: "bridge_v2.py",
-      cwd: "/data/data/com.termux/files/home/tcc-bridge",
+      args: "bridge.py",
+      cwd: process.env.HOME + "/tcc-bridge",
       autorestart: true,
-      restart_delay: 5000,
+      restart_delay: 2000,
+      exp_backoff_restart_delay: 100,
+      watch: false,
+      max_memory_restart: "200M",
       env: {
-        SUPABASE_URL: "https://vbqbbziqleymxcyesmky.supabase.co",
-        SUPABASE_KEY: "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm",
-        NTFY_TOPIC: "zenith-escape",
-        PUBLIC_URL: "https://zenith.cosmic-claw.com"
+        PYTHONUNBUFFERED: "1"
       }
     },
     {
       name: "cloudflared",
       script: "cloudflared",
-      args: "tunnel --config /data/data/com.termux/files/home/.cloudflared/config.yml run",
+      args: "tunnel run",
       autorestart: true,
-      restart_delay: 10000
+      restart_delay: 5000
+    },
+    {
+      name: "supabase-backup",
+      script: "python3",
+      args: "supabase-backup.py",
+      cwd: process.env.HOME + "/tcc-bridge",
+      autorestart: true,
+      restart_delay: 60000
     }
   ]
 };
