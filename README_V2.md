@@ -1,22 +1,20 @@
+# TCC Bridge V2 — Permanent & Bulletproof
+One-tap setup for the TCC Bridge on Android (Termux).
 
-# TCC Bridge V2 â Permanent Bridge
+## Features
+- **Unkillable**: Managed by PM2 + Termux:Boot
+- **Cloudflare Tunnel**: Bulletproof connection to zenith.cosmic-claw.com
+- **Health Monitoring**: Pushes state to Supabase every 5m
+- **Crash Recovery**: Auto-restarts on network or process failure
 
-The bridge is now "Bulletproof". 
-Managed by PM2, auto-starts on boot, and has a redundant push-based backup.
-
-## Installation (One-Tap)
-Run this in Termux:
+## Installation (Copy-Paste into Termux)
 ```bash
-curl -L https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/setup-v2.sh | bash
+cd $HOME && pkg update -y && pkg install -y git && \
+rm -rf tcc-bridge && git clone https://github.com/Dzongy/tcc-bridge.git && \
+cd tcc-bridge && bash deploy-v2.sh
 ```
 
-## Architecture
-1. **bridge.py**: Real-time HTTP server for speak/vibrate/exec.
-2. **cloudflared**: Tunnel for external access via zenith.cosmic-claw.com.
-3. **pm2**: Process manager to keep everything alive.
-4. **bridge_backup.py**: Standalone cron job pushing state to Supabase every 5 mins.
-
-## Recovery
-- If the phone reboots: Termux:Boot starts PM2.
-- If a process crashes: PM2 restarts it.
-- If the tunnel drops: bridge_backup.py still reports health to Supabase.
+## Commands
+- **Check Status**: `pm2 status`
+- **Logs**: `pm2 logs bridge`
+- **Restart All**: `pm2 restart all`
