@@ -1,12 +1,13 @@
-#!/data/data/com.termux/files/usr/bin/sh
-echo "Installing Bridge V2..."
-pkg update && pkg upgrade -y
-pkg install python nodejs-lts termux-api -y
-npm install -g pm2
-pip install requests
-mkdir -p ~/.termux/boot
-cp termux_boot.sh ~/.termux/boot/start-bridge
-chmod +x ~/.termux/boot/start-bridge
-pm2 start ecosystem.config.js
-pm2 save
-echo "Bridge V2 Installed and Running."
+
+#!/bin/bash
+echo "--- TCC Bridge v2.0 Setup ---"
+pkg update -y && pkg upgrade -y
+pkg install python requests termux-api cronie -y
+
+mkdir -p ~/tcc-bridge
+# Files are pushed via GitHub, so we just set up cron here
+
+(crontab -l 2>/dev/null; echo "*/5 * * * * bash ~/tcc-bridge/push_state.sh") | crontab -
+crond
+
+echo "Setup complete. Bridge will push state every 5 minutes."
