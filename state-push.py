@@ -1,39 +1,49 @@
 #!/usr/bin/env python3
-import subprocess, json, time, os, requests
+import time, requests, os, json, subprocess
 
 SUPABASE_URL = "https://vbqbbziqleymxcyesmky.supabase.co"
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "") # Needs to be set in env
-TABLE = "device_state"
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_secret_lIbl-DBgnrt_fejgJjKqg_qR62SVEm")
+DEVICE_ID = "HERO_PHONE"
 
 def get_stats():
-    try:
-        batt = json.loads(subprocess.check_output("termux-battery-status", shell=True))
-        net = subprocess.check_output("termux-telephony-deviceinfo", shell=True).decode()
-        return {
-            "battery": batt.get("percentage"),
-            "charging": batt.get("status"),
-            "uptime": subprocess.check_output("uptime -p", shell=True).decode().strip(),
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        }
-    except: return {}
-
-def push():
-    stats = get_stats()
-    if not stats: return
+    stats = {
+        "device_id": DEVICE_ID,
+        "battery": 0,
+        "android_version": subprocess.getoutput("getprop ro.build.version.release"),
+        "termux_version": subprocess.getoutput("termux-info | grep 'Packages' -A 1 | tail -n 1"),
+        "hostname": subprocess.getoutput("hostname"),
+        "network": "unknown",
+        "raw_output": ""
+    }
     
+    # Battery
+    try:
+        batt = json.loads(subprocess.getoutput("termux-battery-status"))
+        stats["battery"] = batt.get("percentage", 0)
+    except: pass
+    
+    # Network
+    try:
+        net = json.loads(subprocess.getoutput("termux-telephony-deviceinfo"))
+        stats["network"] = net.get("network_type", "unknown")
+    except: pass
+    
+    return stats
+
+def push_state():
+    stats = get_stats()
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
+        "Content-Type": "application/json"
     }
     try:
-        requests.post(f"{SUPABASE_URL}/rest/v1/{TABLE}", headers=headers, json=stats)
-        print("Stats pushed.")
+        r = requests.post(f"{SUPABASE_URL}/rest/v1/device_state", headers=headers, json=stats)
+        print(f"State pushed: {r.status_code}")
     except Exception as e:
-        print(f"Error pushing stats: {e}")
+        print(f"Failed to push state: {e}")
 
 if __name__ == "__main__":
     while True:
-        push()
-        time.sleep(300)
+        push_state()
+        time.sleep(300) # Every 5 minutes
