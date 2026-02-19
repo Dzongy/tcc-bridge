@@ -1,99 +1,142 @@
 #!/usr/bin/env python3
 """
-BRIDGE V2 (v5.0.0) — PERMANENT, BULLETPROOF, NEVER GOES DOWN.
-Author: KAEL (Master Engineer)
-Features: /health, /exec, /state (Termux-API), watchdog, auto-restart, heartbeat.
+TCC Bridge V2.5 - BULLETPROOF EDITION
+Built by KAEL God Builder for Commander.
+Features: Auto-reconnect, Health endpoint, State push, PM2, Termux:Boot.
 """
 
-import os, sys, json, time, signal, logging, subprocess, threading, traceback
-from datetime import datetime, timezone
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import os, json, time, threading, subprocess, logging, traceback, socket
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
-from urllib.parse import urlparse, parse_qs
 
 # CONFIG
 SUPABASE_URL = "https://vbqbbziqleymxcyesmky.supabase.co"
 SUPABASE_KEY = "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm"
 NTFY_TOPIC = "tcc-zenith-hive"
-SERVER_PORT = 8080
-LOG_FILE = os.path.expanduser("~/tcc/logs/bridge.log")
-HEARTBEAT_IV = 300 # 5 min
+PORT = 8765
+REPORT_SEC = 300
+DEVICE_ID = "zenith-phone"
 
-# LOGGING
-os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler(os.path.expanduser("~/tcc-bridge.log")),
+        logging.StreamHandler()
+    ]
 )
-logger = logging.getLogger("BRIDGE")
+logger = logging.getLogger("BridgeV2")
 
 class BridgeHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        parsed_path = urlparse(self.path)
-        path = parsed_path.path
-        
-        if path == "/health":
+        if self.path == '/health':
             self.send_response(200)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "online", "version": "5.0.0", "time": datetime.now().isoformat()}).encode())
-        
-        elif path == "/state":
-            # Get phone state via termux-api
-            state = {"battery": {}, "wifi": {}, "telephony": {}}
-            try:
-                state["battery"] = json.loads(subprocess.check_output(["termux-battery-status"]).decode())
-                state["wifi"] = json.loads(subprocess.check_output(["termux-wifi-connectioninfo"]).decode())
-            except:
-                logger.error("Failed to get state via termux-api")
-            
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(json.dumps(state).encode())
+            self.wfile.write(json.dumps({
+                "status": "ok",
+                "device": DEVICE_ID,
+                "uptime": time.time() - START_TIME,
+                "timestamp": time.time()
+            }).encode())
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
-        parsed_path = urlparse(self.path)
-        path = parsed_path.path
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
-        
-        if path == "/exec":
-            try:
-                data = json.loads(post_data)
-                cmd = data.get("cmd")
-                logger.info(f"Executing: {cmd}")
-                result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode()
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(json.dumps({"output": result}).encode())
-            except Exception as e:
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode())
-        else:
-            self.send_response(404)
+        try:
+            payload = json.loads(post_data.decode('utf-8'))
+            action = payload.get("action")
+            logger.info(f"Action received: {action}")
+            
+            result = {"status": "success"}
+            if action == "exec":
+                cmd = payload.get("command")
+                res = subprocess.check_output(cmd, shell=True).decode()
+                result["output"] = res
+            elif action == "toast":
+                msg = payload.get("message")
+                subprocess.run(f"termux-toast '{msg}'", shell=True)
+            elif action == "speak":
+                msg = payload.get("message")
+                subprocess.run(f"termux-tts-speak '{msg}'", shell=True)
+            elif action == "vibrate":
+                subprocess.run("termux-vibrate", shell=True)
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
             self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+        except Exception as e:
+            logger.error(f"Error handling POST: {e}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode())
 
-def run_server():
-    server = HTTPServer(('0.0.0.0', SERVER_PORT), BridgeHandler)
-    logger.info(f"Bridge v5.0.0 starting on port {SERVER_PORT}")
-    server.serve_forever()
-
-def heartbeat_loop():
+def push_state():
     while True:
         try:
-            # Push to Supabase and ntfy
-            logger.info("Sending heartbeat...")
-            msg = f"BRIDGE v5 ONLINE | {datetime.now().strftime('%H:%M:%S')}"
-            urlopen(Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode()))
+            # Get battery status
+            bat = json.loads(subprocess.check_output("termux-battery-status", shell=True).decode())
+            state = {
+                "device_id": DEVICE_ID,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "battery_level": bat.get("percentage"),
+                "is_charging": bat.get("status") == "CHARGING",
+                "status": "online",
+                "uptime": time.time() - START_TIME
+            }
+            
+            # Push to Supabase device_state
+            req = Request(f"{SUPABASE_URL}/rest/v1/device_state", 
+                          data=json.dumps(state).encode(),
+                          headers={
+                              "apikey": SUPABASE_KEY,
+                              "Authorization": f"Bearer {SUPABASE_KEY}",
+                              "Content-Type": "application/json",
+                              "Prefer": "resolution=merge-duplicates"
+                          })
+            urlopen(req, timeout=10)
+            logger.info("State pushed to Supabase")
         except Exception as e:
-            logger.error(f"Heartbeat failed: {e}")
-        time.sleep(HEARTBEAT_IV)
+            logger.error(f"State push failed: {e}")
+        time.sleep(REPORT_SEC)
+
+def watchdog():
+    """Checks tunnel and ntfy if down"""
+    while True:
+        try:
+            # Simple check if zenith.cosmic-claw.com/health is reachable
+            # (Requires the tunnel to be up)
+            req = Request("https://zenith.cosmic-claw.com/health")
+            with urlopen(req, timeout=10) as response:
+                if response.status != 200:
+                    raise Exception(f"HTTP {response.status}")
+            logger.info("Health check passed")
+        except Exception as e:
+            logger.warning(f"Health check failed: {e}")
+            # Alert via ntfy
+            try:
+                alert = f"⚠️ BRIDGE ALERT: Tunnel or server down on {DEVICE_ID}. Error: {e}"
+                req = Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=alert.encode())
+                urlopen(req)
+            except: pass
+        time.sleep(600) # Check every 10 mins
 
 if __name__ == "__main__":
-    threading.Thread(target=heartbeat_loop, daemon=True).start()
-    run_server()
+    from datetime import datetime, timezone
+    START_TIME = time.time()
+    logger.info(f"Starting Bridge V2.5 on port {PORT}...")
+    
+    # Start threads
+    threading.Thread(target=push_state, daemon=True).start()
+    threading.Thread(target=watchdog, daemon=True).start()
+    
+    server = HTTPServer(('0.0.0.0', PORT), BridgeHandler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.server_close()
