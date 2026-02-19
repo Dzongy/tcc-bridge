@@ -1,107 +1,82 @@
 #!/usr/bin/env python3
 """
-TCC Bridge V2 — PERMANENT, BULLETPROOF, NEVER GOES DOWN.
-Author: Kael (Master Engineer)
-Version: 2.1.0
+TCC Bridge V10.0 — THE ETERNAL BRIDGE (Bulletproof)
+Built by KAEL God Builder for Commander.
+Features: Health checks, Termux integration, robust command execution.
 """
-
-import os, sys, json, time, signal, logging, subprocess, threading, traceback
-from datetime import datetime, timezone
+import os, sys, json, time, logging, subprocess, threading, socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse, parse_qs
 
 # CONFIG
-SERVER_PORT = 8080 # User mentioned :8080 in tunnel context
-LOG_FILE = os.path.expanduser("~/tcc-bridge.log")
-SUPABASE_URL = "https://vbqbbziqleymxcyesmky.supabase.co"
-SUPABASE_KEY = "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm"
-NTFY_TOPIC = "tcc-zenith-hive"
+PORT = int(os.environ.get("BRIDGE_PORT", "8765"))
+AUTH_TOKEN = os.environ.get("BRIDGE_AUTH", "amos-bridge-2026")
+DEVICE_ID = "amos-arms"
 
-# LOGGING
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()]
-)
-logger = logging.getLogger("bridge")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+log = logging.getLogger("bridge")
 
 class BridgeHandler(BaseHTTPRequestHandler):
-    def _send_response(self, code, data):
-        self.send_response(code)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-
     def do_GET(self):
         if self.path == '/health':
-            status = {
-                "status": "online",
-                "version": "2.1.0",
-                "uptime": time.time() - start_time,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-            self._send_response(200, status)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "alive", "device": DEVICE_ID, "time": time.time()}).encode())
         else:
-            self._send_response(404, {"error": "Not Found"})
+            self.send_error(404)
 
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length).decode('utf-8')
+        body = self.rfile.read(content_length).decode()
         try:
-            data = json.loads(body) if body else {}
+            data = json.loads(body)
         except:
-            data = {}
+            self.send_error(400, "Invalid JSON")
+            return
 
-        if self.path == '/exec':
-            cmd = data.get('cmd')
-            if not cmd: return self._send_response(400, {"error": "Missing 'cmd'"})
+        if data.get("auth") != AUTH_TOKEN:
+            self.send_error(401, "Unauthorized")
+            return
+
+        path = urlparse(self.path).path
+        
+        if path == '/exec':
+            cmd = data.get("command")
+            if not cmd:
+                self.send_error(400, "Missing command")
+                return
             try:
-                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
-                self._send_response(200, {"stdout": result.stdout, "stderr": result.stderr, "code": result.returncode})
+                output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=30).decode()
+                self._send_json({"status": "success", "output": output})
+            except subprocess.CalledProcessError as e:
+                self._send_json({"status": "error", "output": e.output.decode()}, 500)
             except Exception as e:
-                self._send_response(500, {"error": str(e)})
+                self._send_json({"status": "error", "message": str(e)}, 500)
 
-        elif self.path == '/toast':
-            text = data.get('text', 'Hello from Bridge')
-            subprocess.run(f"termux-toast '{text}'", shell=True)
-            self._send_response(200, {"status": "ok"})
+        elif path == '/toast':
+            msg = data.get("message", "Bridge Pulse")
+            subprocess.run(f"termux-toast '{msg}'", shell=True)
+            self._send_json({"status": "success"})
 
-        elif self.path == '/speak':
-            text = data.get('text', '')
-            subprocess.run(f"termux-tts-speak '{text}'", shell=True)
-            self._send_response(200, {"status": "ok"})
-
-        elif self.path == '/vibrate':
-            duration = data.get('duration', 300)
-            subprocess.run(f"termux-vibrate -d {duration}", shell=True)
-            self._send_response(200, {"status": "ok"})
-
-        elif self.path == '/restart':
-            self._send_response(200, {"status": "restarting"})
-            def restart():
-                time.sleep(1)
-                os.execv(sys.executable, ['python3'] + sys.argv)
-            threading.Thread(target=restart).start()
+        elif path == '/speak':
+            msg = data.get("message", "Bridge active")
+            subprocess.run(f"termux-tts-speak '{msg}'", shell=True)
+            self._send_json({"status": "success"})
 
         else:
-            self._send_response(404, {"error": "Not Found"})
+            self.send_error(404)
 
-start_time = time.time()
-if __name__ == "__main__":
-    server = HTTPServer(('0.0.0.0', SERVER_PORT), BridgeHandler)
-    logger.info(f"Bridge V2 listening on port {SERVER_PORT}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    server.server_close()
+    def _send_json(self, data, code=200):
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', PORT), BridgeHandler)
+    log.info(f"Bridge V10.0 listening on port {PORT}...")
+    server.serve_forever()
+
+if __name__ == '__main__':
+    run_server()
