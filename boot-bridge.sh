@@ -1,5 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# Termux:Boot Script for TCC Bridge
+#!/bin/bash
 termux-wake-lock
 cd ~/tcc-bridge
-./watchdog-v2.sh &
+pm2 start ecosystem.config.js
