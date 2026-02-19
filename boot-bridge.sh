@@ -1,6 +1,7 @@
-#!/bin/bash
-# Termux:Boot script for TCC Bridge
+#!/data/data/com.termux/files/usr/bin/sh
+# Bridge V2 Boot Script
 termux-wake-lock
-cd ~/tcc-bridge
-pm2 resurrect || pm2 start ecosystem.config.js
-pm2 save
+# Wait for network
+sleep 10
+# Start PM2 processes
+pm2 resurrect
