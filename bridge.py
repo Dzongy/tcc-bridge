@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-TCC Bridge v6.0 — THE PERMANENT BRIDGE
-Bulletproof phone control HTTP server for Termux.
-Survives: Reboots, network drops, process kills, memory cleanup.
+TCC Bridge v7.0 — THE BULLETPROOF BRIDGE
+One-tap permanent phone control for Termux.
 """
 import subprocess, json, os, sys, socket, signal, logging, time, threading, traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -14,11 +13,8 @@ from urllib.parse import parse_qs, urlparse
 AUTH_TOKEN = os.environ.get("BRIDGE_AUTH", "amos-bridge-2026")
 PORT = int(os.environ.get("BRIDGE_PORT", "8080"))
 LOG_FILE = os.path.expanduser("~/tcc/logs/bridge.log")
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vbqbbziqleymxcyesmky.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "tcc-zenith-hive")
-PUBLIC_URL = os.environ.get("PUBLIC_URL", "https://zenith.cosmic-claw.com")
-VERSION = "6.0.0"
+VERSION = "7.0.0"
 START_TIME = time.time()
 
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -29,68 +25,88 @@ log = logging.getLogger("bridge")
 def ntfy(msg, priority=3, tags=None):
     try:
         req = Request(f"https://ntfy.sh/{NTFY_TOPIC}", data=msg.encode('utf-8'))
-        req.add_header("Title", "TCC Bridge V6")
+        req.add_header("Title", "TCC Bridge V7")
         req.add_header("Priority", str(priority))
         if tags: req.add_header("Tags", ",".join(tags))
-        urlopen(req)
+        urlopen(req, timeout=5)
     except Exception as e: log.error(f"ntfy failed: {e}")
 
 class BridgeHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args): log.info("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), format%args))
+    def log_message(self, format, *args): 
+        log.info("%s - - [%s] %s" % (self.client_address[0], self.log_date_time_string(), format%args))
     
-    def do_GET(self):
-        parsed_path = urlparse(self.path)
-        path = parsed_path.path
-        
-        # Public health check (No Auth)
-        if path == "/health":
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            uptime = time.time() - START_TIME
-            self.wfile.write(json.dumps({"status": "alive", "version": VERSION, "uptime_sec": int(uptime)}).encode())
-            return
+    def respond(self, status, data):
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode('utf-8'))
 
-        # Auth Check
-        auth = self.headers.get('Authorization')
-        if auth != f"Bearer {AUTH_TOKEN}":
-            self.send_response(401)
-            self.end_headers()
-            return
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        params = parse_qs(parsed.query)
+        
+        # Auth
+        token = params.get('auth', [None])[0] or self.headers.get('Authorization')
+        if token and token.startswith('Bearer '): token = token[7:]
+        
+        if path == "/health":
+            return self.respond(200, {"status": "ok", "version": VERSION, "uptime": time.time() - START_TIME})
+
+        if token != AUTH_TOKEN:
+            return self.respond(401, {"error": "Unauthorized"})
+
+        if path == "/status":
+            return self.respond(200, {
+                "version": VERSION,
+                "uptime": time.time() - START_TIME,
+                "port": PORT,
+                "hostname": socket.gethostname()
+            })
+
+        self.respond(404, {"error": "Not Found"})
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        
+        # Auth
+        token = self.headers.get('Authorization')
+        if token and token.startswith('Bearer '): token = token[7:]
+        if token != AUTH_TOKEN:
+            return self.respond(401, {"error": "Unauthorized"})
+
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body) if body else {}
+        except:
+            return self.respond(400, {"error": "Invalid JSON"})
 
         if path == "/exec":
-            query = parse_qs(parsed_path.query)
-            cmd = query.get('cmd', [''])[0]
-            if not cmd:
-                self.send_response(400)
-                self.end_headers()
-                return
+            cmd = data.get("cmd")
+            if not cmd: return self.respond(400, {"error": "No command"})
             try:
-                res = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode()
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(res.encode())
+                result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=30)
+                return self.respond(200, {"output": result.decode('utf-8')})
+            except subprocess.CalledProcessError as e:
+                return self.respond(500, {"error": e.output.decode('utf-8')})
             except Exception as e:
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(str(e).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
+                return self.respond(500, {"error": str(e)})
+
+        if path == "/toast":
+            msg = data.get("msg", "TCC Hello")
+            subprocess.run(f"termux-toast '{msg}'", shell=True)
+            return self.respond(200, {"status": "sent"})
+
+        self.respond(404, {"error": "Not Found"})
 
 def run_server():
     server = HTTPServer(('0.0.0.0', PORT), BridgeHandler)
-    log.info(f"Bridge V6 started on port {PORT}")
-    ntfy("🚀 Bridge Online", priority=4, tags=["rocket", "check"])
+    log.info(f"Bridge V7 starting on port {PORT}")
+    ntfy("Bridge V7 Online", priority=4, tags=["rocket", "check"])
     server.serve_forever()
 
 if __name__ == "__main__":
-    try:
-        run_server()
-    except KeyboardInterrupt:
-        log.info("Shutdown")
-    except Exception as e:
-        log.critical(f"Fatal error: {traceback.format_exc()}")
-        ntfy(f"⚠️ Bridge Crash: {e}", priority=5, tags=["warning", "skull"])
-        sys.exit(1)
+    run_server()
