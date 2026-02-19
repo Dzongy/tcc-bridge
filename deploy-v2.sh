@@ -1,21 +1,17 @@
-#!/data/data/com.termux/files/usr/bin/sh
-echo "--- TCC BRIDGE V2 INSTALLER ---"
-pkg update -y && pkg upgrade -y
-pkg install -y python nodejs termux-api cloudflared
-
+#!/bin/bash
+echo "🚀 Installing TCC Bridge V8..."
+pkg update && pkg upgrade -y
+pkg install python python-pip nodejs cloudflared -y
 npm install -g pm2
-pip install flask # In case we use flask later, but currently using http.server
-
+mkdir -p ~/tcc/logs
 cd ~
 if [ ! -d "tcc-bridge" ]; then
-  git clone https://github.com/Dzongy/tcc-bridge
+    git clone https://github.com/Dzongy/tcc-bridge.git
 fi
 cd tcc-bridge
-git pull origin main
-
+chmod +x *.sh
 # Setup Termux:Boot
 mkdir -p ~/.termux/boot
 cp boot-bridge.sh ~/.termux/boot/
 chmod +x ~/.termux/boot/boot-bridge.sh
-
-echo "Installation complete. Please edit ecosystem.config.js with your Cloudflare token, then run: pm2 start ecosystem.config.js"
+echo "✅ Setup complete. Run 'pm2 start ecosystem.config.js' to start."
