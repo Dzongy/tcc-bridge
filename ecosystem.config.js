@@ -1,36 +1,27 @@
+
 module.exports = {
   apps: [
     {
-      name: 'tcc-bridge',
-      script: 'bridge.py',
-      cwd: '/data/data/com.termux/files/home/tcc-bridge',
-      interpreter: 'python',
+      name: "tcc-bridge",
+      script: "python3",
+      args: "bridge.py",
+      cwd: "/data/data/com.termux/files/home/tcc",
       autorestart: true,
-      max_restarts: 999,
-      restart_delay: 3000,
-      exp_backoff_restart_delay: 1000,
+      restart_delay: 5000,
       env: {
-        BRIDGE_AUTH: 'amos-bridge-2026',
-        BRIDGE_PORT: '8080'
+        BRIDGE_AUTH: "amos-bridge-2026",
+        BRIDGE_PORT: "8080",
+        SUPABASE_URL: "https://vbqbbziqleymxcyesmky.supabase.co",
+        NTFY_TOPIC: "tcc-zenith-hive",
+        PUBLIC_URL: "https://zenith.cosmic-claw.com"
       }
     },
     {
-      name: 'tcc-tunnel',
-      script: 'cloudflared',
-      args: 'tunnel run 18ba1a49-fdf9-4a52-a27a-5250d397c5c5',
-      cwd: '/data/data/com.termux/files/home',
+      name: "cloudflared",
+      script: "cloudflared",
+      args: "tunnel run",
       autorestart: true,
-      max_restarts: 999,
-      restart_delay: 5000,
-      exp_backoff_restart_delay: 2000
-    },
-    {
-      name: 'tcc-state-push',
-      script: 'state-push.py',
-      cwd: '/data/data/com.termux/files/home/tcc-bridge',
-      interpreter: 'python',
-      autorestart: true,
-      restart_delay: 60000
+      restart_delay: 10000
     }
   ]
 };
