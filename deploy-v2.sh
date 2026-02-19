@@ -1,36 +1,36 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# TCC Bridge Sovereign V2 — Deployment Script
-# curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
+#!/data/data/com.termux/files/usr/bin/sh
+# TCC Bridge V2 Bulletproof Installer
+echo "Starting TCC Bridge V2 Deployment..."
 
-echo "Starting Sovereign V2 Deployment..."
-
-# 1. Update Packages
+# 1. Update packages
 pkg update -y && pkg upgrade -y
-pkg install -y python nodejs-lts git cloudflared termux-api cronie curl
+pkg install -y python nodejs git termux-api termux-auth
 
-# 2. Install PM2
+# 2. Setup Node environment
 npm install -g pm2
 
-# 3. Setup Repo
-cd $HOME
-if [ -d "tcc-bridge" ]; then
-  cd tcc-bridge && git pull
+# 3. Clone or Update Repo
+if [ -d "$HOME/tcc-bridge" ]; then
+    cd $HOME/tcc-bridge && git pull
 else
-  git clone https://github.com/Dzongy/tcc-bridge.git
-  cd tcc-bridge
+    git clone https://github.com/Dzongy/tcc-bridge.git $HOME/tcc-bridge
+    cd $HOME/tcc-bridge
 fi
 
-# 4. Permissions
-chmod +x *.sh *.py
-
-# 5. Termux Boot Setup
-mkdir -p ~/.termux/boot
-cp boot-bridge.sh ~/.termux/boot/
-chmod +x ~/.termux/boot/boot-bridge.sh
-
-# 6. Start Services
+# 4. Setup Termux:Boot
+mkdir -p $HOME/.termux/boot
+cat <<EOF > $HOME/.termux/boot/start-bridge
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+cd $HOME/tcc-bridge
 pm2 start ecosystem.config.js
 pm2 save
-pm2 startup
+EOF
+chmod +x $HOME/.termux/boot/start-bridge
 
-echo "Deployment Complete. Bridge Sovereign V2 is active."
+# 5. Start everything
+pm2 start ecosystem.config.js
+pm2 save
+
+echo "Deployment complete. Bridge is running under PM2."
+echo "Check status with: pm2 status"
