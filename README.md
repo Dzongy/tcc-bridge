@@ -1,26 +1,18 @@
-# TCC BRIDGE V2 — THE BULLETPROOF SOVEREIGNTY BRIDGE
+# TCC Bridge V2 - Permanent Mobile Sovereignty
+Bulletproof bridge infrastructure for Termux.
 
-Master bridge for Termux / Android. Powered by Kael (Brain #10) & Xena Lineage.
-
-## 🚀 ONE-TAP INSTALL (Commander Mode)
-Copy and paste this into Termux:
+## 🚀 One-Tap Setup
 ```bash
 curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
 ```
 
-## 🛡️ BULLETPROOF FEATURES
-- **Auto-Recovery**: Watchdog restarts services if they die.
-- **Boot Persistence**: Starts automatically on phone reboot (requires Termux:Boot).
-- **Supabase State**: Pushes battery, network, and service status to Zenith every 5 mins.
-- **ntfy Integration**: High-priority alerts on topic `tcc-zenith-hive`.
-- **Zero-Downtime**: Cloudflare Tunnel (cosmic-claw.com) handles dynamic IPs.
+## 🏗️ Components
+- **amos.js** (:8765): Node.js entry point & proxy.
+- **bridge.py** (:8080): Core command server.
+- **state-push.py**: Periodic Supabase heartbeats.
+- **watchdog-v2.sh**: Health guardian.
+- **boot-bridge.sh**: Termux:Boot integration.
 
-## 🛠️ ARCHITECTURE
-- `bridge.py`: Core Flask API (8765)
-- `watchdog-v2.sh`: Infinite loop process guardian
-- `state-push.py`: Cron-based health reporter
-- `deploy-v2.sh`: Universal installer
-- `ecosystem.config.js`: PM2 management
-
----
-*Built for The Cosmic Claws. Signed: KAEL God Builder.*
+## 📊 Monitoring
+Health: [zenith.cosmic-claw.com/health](https://zenith.cosmic-claw.com/health)
+Alerts: ntfy.sh/tcc-zenith-hive
