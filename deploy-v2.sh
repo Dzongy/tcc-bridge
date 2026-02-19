@@ -1,33 +1,38 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# TCC Bridge v6.0 — ONE-TAP SETUP
-set -euo pipefail
+#!/bin/bash
+# TCC Bridge V2 - ONE TAP SETUP
+# Installs everything and starts the permanent bridge.
 
-echo "--- TCC BRIDGE V6.0 INSTALLER ---"
+set -e
 
-# 1. Update & Install Deps
-pkg update -y && pkg upgrade -y
-pkg install -y python termux-api nodejs git cloudflared cronie
+echo "Starting TCC Bridge V2 Setup..."
 
-# 2. Setup Node/PM2
+# 1. Update & Dependencies
+pkg update -y
+pkg install -y python nodejs-lts termux-api cloudflared nmap procps
+
+# 2. PM2 Setup
 npm install -g pm2
 
-# 3. Create Directories
+# 3. Setup Directories
 mkdir -p ~/tcc/logs
 mkdir -p ~/.termux/boot
 
-# 4. Fetch Scripts from Repo (Assuming current directory is ~/tcc-bridge)
-# Or we can just use the files already pushed.
-
-# 5. Setup Termux Boot
-cp boot-bridge.sh ~/.termux/boot/
+# 4. Termux:Boot Link
+cp boot-bridge.sh ~/.termux/boot/boot-bridge.sh
 chmod +x ~/.termux/boot/boot-bridge.sh
+
+# 5. Make scripts executable
+chmod +x *.sh
+chmod +x *.py
 
 # 6. Start PM2
 pm2 start ecosystem.config.js
 pm2 save
 pm2 startup
 
-echo "--- INSTALL COMPLETE ---"
-echo "Bridge is running via PM2."
-echo "Cloudflare tunnel: zenith.cosmic-claw.com"
-echo "Check health: curl http://localhost:8765/health"
+echo "----------------------------------------"
+echo "SETUP COMPLETE!"
+echo "Bridge: http://localhost:8080"
+echo "Tunnel: zenith.cosmic-claw.com"
+echo "PM2 Dashboard: pm2 list"
+echo "----------------------------------------"
