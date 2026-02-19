@@ -1,30 +1,37 @@
-#!/data/data/com.termux/files/usr/bin/sh
-# BRIDGE V2: ONE-TAP SETUP (v5.2)
-echo "🚀 Starting Bridge V2 Sovereign Install..."
+#!/data/data/com.termux/files/usr/bin/bash
+echo "🚀 Installing TCC Bridge V10.0 (Bulletproof)..."
 
-# 1. Update & Dependencies
-pkg update -y
-pkg install python nodejs-lts termux-api cloudflared -y
+# Dependencies
+pkg update && pkg upgrade -y
+pkg install python python-pip nodejs cloudflared termux-api coreutils debianutils nmap -y
+pip install requests
+
+# PM2
 npm install -g pm2
 
-# 2. Setup Directories
+# Setup Repo
+mkdir -p ~/tcc
+cd ~/tcc
+if [ ! -d "tcc-bridge" ]; then
+    git clone https://github.com/Dzongy/tcc-bridge.git
+fi
+cd tcc-bridge
+git pull origin main
+chmod +x *.sh
+
+# Setup Termux:Boot
 mkdir -p ~/.termux/boot
-mkdir -p ~/tcc-bridge && cd ~/tcc-bridge
+cp boot-bridge.sh ~/.termux/boot/
+chmod +x ~/.termux/boot/boot-bridge.sh
 
-# 3. Download Files
-REPO="https://raw.githubusercontent.com/Dzongy/tcc-bridge/main"
-curl -sS -o bridge.py "$REPO/bridge.py"
-curl -sS -o ecosystem.config.js "$REPO/ecosystem.config.js"
-curl -sS -o state-push.py "$REPO/state-push.py"
-curl -sS -o ~/.termux/boot/boot-bridge.sh "$REPO/boot-bridge.sh"
-curl -sS -o watchdog-v2.sh "$REPO/watchdog-v2.sh"
+# Setup Cron for state-push (runs every 5 minutes)
+(crontab -l 2>/dev/null; echo "*/5 * * * * python3 ~/tcc/tcc-bridge/state-push.py") | crontab -
 
-chmod +x bridge.py state-push.py watchdog-v2.sh ~/.termux/boot/boot-bridge.sh
-
-# 4. Start PM2
-pm2 stop all || true
+# Start via PM2
 pm2 start ecosystem.config.js
 pm2 save
+pm2 startup
 
-echo "✅ BRIDGE V2 INSTALLED."
-echo "Check ntfy tcc-zenith-hive for status."
+echo "✅ BRIDGE V10.0 DEPLOYED."
+echo "Commander, simply run 'pm2 list' to check status."
+curl -d "Bridge V10.0 Deployment Complete on $HOSTNAME" https://ntfy.sh/tcc-zenith-hive
