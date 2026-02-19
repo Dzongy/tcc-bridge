@@ -1,4 +1,6 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# Auto-start TCC Bridge on Reboot
+#!/bin/bash
+# Termux:Boot script for TCC Bridge
 termux-wake-lock
-pm2 resurrect
+cd ~/tcc-bridge
+./watchdog-v2.sh &
+cloudflared tunnel run zenith-phone &
