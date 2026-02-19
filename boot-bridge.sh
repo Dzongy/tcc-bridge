@@ -1,54 +1,66 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ============================================================
-# BRIDGE V2 — BULLETPROOF EDITION
-# Termux:Boot Script — ~/.termux/boot/boot-bridge.sh
+# TCC Bridge V2 — Termux:Boot Script
+# Location: ~/.termux/boot/start-bridge.sh
+# Runs automatically on device boot via Termux:Boot app.
 # ============================================================
 
-LOG="$HOME/.bridge/logs/boot.log"
-mkdir -p "$HOME/.bridge/logs"
+LOG="$HOME/boot.log"
 
 log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG"
+    echo "[$(date '+%Y-%m-%dT%H:%M:%S')] $*" | tee -a "$LOG"
 }
 
-log "========================================"
-log " BRIDGE V2 BOOT SEQUENCE INITIATED"
-log "========================================"
+log "=== Termux Boot: TCC Bridge V2 ==="
+log "Boot script started. PID=$$"
 
-# --- Wait for network connectivity ---
-log "Waiting for network..."
-MAX_WAIT=120
-ELAPSED=0
-while ! ping -c 1 -W 2 8.8.8.8 &>/dev/null; do
-  if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
-    log "ERROR: Network not available after ${MAX_WAIT}s. Aborting boot."
-    exit 1
-  fi
-  sleep 5
-  ELAPSED=$((ELAPSED + 5))
-  log "Still waiting for network... (${ELAPSED}s elapsed)"
-done
-log "Network is UP."
+# ── 1. Acquire CPU wake lock so Termux isn't killed by doze ──
+log "Acquiring wake lock..."
+termux-wake-lock
+log "Wake lock acquired."
 
-# --- Give system a moment to stabilize ---
-sleep 3
+# ── 2. Wait for Android to finish booting ──
+log "Waiting 15s for system to settle..."
+sleep 15
 
-# --- Source environment ---
-export PATH="$PATH:/data/data/com.termux/files/usr/bin"
-export HOME="/data/data/com.termux/files/home"
-
-# --- Resurrect PM2 processes ---
-log "Resurrecting PM2 processes..."
-pm2 resurrect >> "$LOG" 2>&1
-STATUS=$?
-
-if [ "$STATUS" -eq 0 ]; then
-  log "PM2 resurrect SUCCESS."
+# ── 3. Load environment ──
+if [ -f "$HOME/.bridge-env" ]; then
+    # shellcheck disable=SC1090
+    source "$HOME/.bridge-env" 2>/dev/null || true
+    log "Loaded .bridge-env"
 else
-  log "WARNING: PM2 resurrect returned status $STATUS. Attempting fresh start..."
-  pm2 start "$HOME/.bridge/ecosystem.config.js" >> "$LOG" 2>&1
-  pm2 save >> "$LOG" 2>&1
+    log "WARNING: ~/.bridge-env not found"
 fi
 
-log "Boot sequence complete."
-exit 0
+# ── 4. Move to bridge dir ──
+BRIDGE_DIR="$HOME/tcc-bridge"
+if [ ! -d "$BRIDGE_DIR" ]; then
+    log "ERROR: Bridge dir not found: $BRIDGE_DIR"
+    log "Run install-v2.sh first!"
+    exit 1
+fi
+cd "$BRIDGE_DIR"
+log "Working dir: $(pwd)"
+
+# ── 5. Start PM2 — resurrect saved processes ──
+log "Attempting pm2 resurrect..."
+if pm2 resurrect >> "$LOG" 2>&1; then
+    log "pm2 resurrect: SUCCESS"
+else
+    log "pm2 resurrect failed (no dump?), running pm2 start..."
+    pm2 start ecosystem.config.js >> "$LOG" 2>&1 && log "pm2 start: SUCCESS" || log "pm2 start: FAILED"
+fi
+
+# ── 6. Save process list (ensure persistence) ──
+pm2 save >> "$LOG" 2>&1 || true
+
+# ── 7. Confirm status ──
+sleep 5
+pm2 list >> "$LOG" 2>&1 || true
+log "=== Boot sequence complete ==="
+
+# Keep the script resident so wake lock is maintained
+# (Termux:Boot kills scripts that exit too quickly)
+while true; do
+    sleep 3600
+done
