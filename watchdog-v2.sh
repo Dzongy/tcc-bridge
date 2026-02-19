@@ -1,30 +1,17 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# TCC Watchdog V2
-# Ensures PM2 is running and manages logs
-
-LOG_FILE="$HOME/tcc/logs/watchdog.log"
-mkdir -p "$(dirname "$LOG_FILE")"
-
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
-}
-
-log "Watchdog starting..."
+# BRIDGE V2 - INFINITE WATCHDOG
+TUNNEL_ID="18ba1a49-fdf9-4a52-a27a-5250d397c5c5"
 
 while true; do
-    # Check if PM2 is alive
-    if ! pm2 ping > /dev/null 2>&1; then
-        log "PM2 not responding. Restarting..."
-        pm2 resurrect || pm2 start ecosystem.config.js
-    fi
+  # 1. Start Tunnel if not running
+  if ! pgrep -x "cloudflared" > /dev/null; then
+    cloudflared tunnel run $TUNNEL_ID > ~/tcc-bridge/tunnel.log 2>&1 &
+  fi
 
-    # Check disk space
-    DISK_USAGE=$(df . | awk 'NR==2 {print $5}' | sed 's/%//')
-    if [ "$DISK_USAGE" -gt 90 ]; then
-        log "Disk space low ($DISK_USAGE%). Clearing logs..."
-        pm2 flush
-        rm -rf $HOME/tcc/logs/*.log.*
-    fi
+  # 2. Start PM2 if not running
+  if ! pgrep -f "pm2" > /dev/null; then
+    pm2 start ecosystem.config.js
+  fi
 
-    sleep 60
+  sleep 60
 done
