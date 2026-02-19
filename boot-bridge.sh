@@ -1,8 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# TCC Boot Loader
+#!/data/data/com.termux/files/usr/bin/sh
+# Termux:Boot script for TCC Bridge
 termux-wake-lock
-echo "Booting TCC Infrastructure..."
-sleep 15
-pm2 resurrect || pm2 start $HOME/tcc-bridge/ecosystem.config.js
-# Ensure crond is running for other tasks
-crond 2>/dev/null || true
+pm2 resurrect || pm2 start ecosystem.config.js
