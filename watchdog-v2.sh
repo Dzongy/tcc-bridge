@@ -1,9 +1,20 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# TCC Bridge Watchdog v10.0.1
+# watchdog-v2.sh - Infinite vigilance
 while true; do
-  if ! curl -s http://localhost:8080/health > /dev/null; then
-    pm2 restart tcc-bridge
-    curl -X POST https://ntfy.sh/tcc-zenith-hive -d "⚠️ Bridge Unresponsive - Auto-Restarted"
+  # Check Bridge
+  if ! curl -s localhost:8080/health | grep -q "online"; then
+    echo "Bridge offline. Restarting..."
+    pm2 restart bridge || pm2 start $HOME/tcc-bridge/bridge.py --name bridge
   fi
+  
+  # Check Cloudflared
+  if ! pm2 status cloudflared | grep -q "online"; then
+    echo "Cloudflared offline. Restarting..."
+    pm2 restart cloudflared
+  fi
+  
+  # Push state every 10 min (600s)
+  python3 $HOME/tcc-bridge/state-push.py
+  
   sleep 60
 done
