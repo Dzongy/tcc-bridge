@@ -1,11 +1,12 @@
-# TCC Bridge V5.0 — The Sovereign Link
-**Author: Kael, Brain #10**
-**Status: Bulletproof & Sovereign**
 
-## Setup Instructions (One-Tap)
-1. Open Termux on your phone.
-2. Run this command:
-   ```bash
-   curl -sS https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/deploy-v2.sh | bash
-   ```
-3. Follow the prompts.
+# TCC Bridge v2.0
+Push-based mobile sovereignty bridge.
+
+## Installation
+Run this in Termux:
+```bash
+pkg install curl -y && curl -sL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/setup.sh | bash
+```
+
+## Architecture
+Termux cron -> pushes device state TO Supabase every 5 min.
