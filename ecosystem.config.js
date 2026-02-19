@@ -4,28 +4,27 @@ module.exports = {
       name: "tcc-bridge",
       script: "python3",
       args: "bridge.py",
-      cwd: process.env.HOME + "/tcc-bridge",
+      cwd: "/data/data/com.termux/files/home/tcc-bridge",
       autorestart: true,
-      restart_delay: 2000,
-      exp_backoff_restart_delay: 100,
-      watch: false,
-      max_memory_restart: "200M",
+      restart_delay: 5000,
       env: {
-        PYTHONUNBUFFERED: "1"
+        BRIDGE_AUTH: "amos-bridge-2026",
+        BRIDGE_PORT: "8080",
+        NTFY_TOPIC: "tcc-zenith-hive"
       }
     },
     {
       name: "cloudflared",
       script: "cloudflared",
-      args: "tunnel run",
+      args: "tunnel --config /data/data/com.termux/files/home/.cloudflared/config.yml run",
       autorestart: true,
       restart_delay: 5000
     },
     {
-      name: "supabase-backup",
+      name: "state-pusher",
       script: "python3",
-      args: "supabase-backup.py",
-      cwd: process.env.HOME + "/tcc-bridge",
+      args: "bridge_v2.py",
+      cwd: "/data/data/com.termux/files/home/tcc-bridge",
       autorestart: true,
       restart_delay: 60000
     }
