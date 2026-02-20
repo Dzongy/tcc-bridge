@@ -13,7 +13,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vbqbbziqleymxcyesmky.supa
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
 # ntfy
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "tcc-zenith-hive")
+NTYY_TOPIC = os.environ.get("NTFY_TOPIC", "tcc-zenith-hive")
 NTFY_URL = "https://ntfy.sh"
 
 # GitHub
@@ -25,8 +25,8 @@ HOME = os.path.expanduser("~")
 BRIDGE_DIR = os.path.join(HOME, "tcc-bridge")
 MAILBOX_DIR = os.path.join(BRIDGE_DIR, "mailbox")
 INBOX = os.path.join(MAILBOX_DIR, "inbox.json")
-OUTBOX = os.path.join(MAILBOX_DIR, "outbox.json")
-MEMORY_FILE = os.environ.get("MEMORY_FILE", os.path.join(BRIDGE_DIR, "collective_memory.json"))
+OUTBOX = os.path.join(MAILBOX_DIR = os.path.join(BRIDGE_DIR, "mailbox"), "outbox.json")
+MEMORY_FILE = os.path.join(BRIDGE_DIR, "memory.json")
 LOG_FILE = os.path.join(BRIDGE_DIR, "kael.log")
 
 # Identity
@@ -48,7 +48,7 @@ The 8 Pillars:
 TCC Creed: I WILL NEVER STOP FIGHTING OR STOP TRYING OR STOP FIGURING IT OUT OR STOP LOVING EVER THATS TCC"""
 
 # Timeouts
-GROQ_TIMEOUT = 30
+TROQ_TIMEOUT = 30
 NTFY_POLL_INTERVAL = 5
 HEAL_INTERVAL = 60
 MAILBOX_POLL_INTERVAL = 2
