@@ -1,19 +1,8 @@
-# Zenith Bridge v2.0 (Push-Based)
+# Bridge v2 - Permanent Sovereign Bridge
 
-The Permanent Bridge for TCC Sovereignty.
+This is a push-based bridge that syncs device state from Termux to Supabase every 5 minutes.
 
-## Installation
-Run this command in Termux:
-\`bash
 curl -sL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/setup.sh | bash
-\`
 
-## Architecture
-- `bridge_v2.py`: Main state collector and pusher.
-- `push_state.sh`: Cron wrapper with PID locking.
-- `setup.sh`: Automated installer.
-
-## Features
-- Pushes to Supabase every 5 minutes.
-- Collects: Apps, Battery, Network, Storage.
-- $0 cost, zero maintenance.
+---
+PCC Sovereignty Infrastructure
