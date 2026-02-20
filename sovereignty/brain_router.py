@@ -12,7 +12,7 @@ class BrainRouter:
         self.last_error = None
         self.alive = bool(GROQ_API_KEY)
         if not self.alive:
-            print("[BRAINW WARNING: No GROQ_API_KEY — brain is offline. Set it in environment.")
+            print("[BRAIN] WARNING: No GROQ_API_KEY — brain is offline. Set it in environment.")
 
     def think(self, prompt, context=None, max_tokens=1024):
         """Send a thought to Groq and get a response. Returns string."""
@@ -23,14 +23,14 @@ class BrainRouter:
             {"role": "system", "content": KAEL_IDENTITY},
         ]
         if context:
-            messages.append({"role": "system", "content": f'Context: {context}'})
+            messages.append({"role": "system", "content": f"Context: {context}"})
         messages.append({"role": "user", "content": prompt})
 
         try:
             resp = requests.post(
                 GROQ_URL,
                 headers={
-                    "Authorization": f'Bearer {GROQ_API_KEY}',
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
                     "Content-Type": "application/json"
                 },
                 json={
@@ -44,9 +44,9 @@ class BrainRouter:
             self.call_count += 1
 
             if resp.status_code != 200:
-                self.last_error = f'HTTP {resp.status_code}: {resp.text[:200]}'
-                print(f'[BRAINW Error: {self.last_error}')
-                return f'[brain error: HTTP {resp.status_code}]'
+                self.last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                print(f"[BRAIN] Error: {self.last_error}")
+                return f"[brain error: HTTP {resp.status_code}]"
 
             data = resp.json()
             usage = data.get("usage", {})
