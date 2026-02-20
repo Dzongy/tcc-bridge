@@ -1,4 +1,4 @@
-// ecosystem.config.js — TCC Bridge V3 PM2 Process Manager Configuration
+// ecosystem.config.js â TCC Bridge V3 PM2 Process Manager Configuration
 // Place at: ~/tcc-bridge/ecosystem.config.js
 // Usage:  pm2 start ecosystem.config.js
 //         pm2 reload ecosystem.config.js --update-env
@@ -7,11 +7,34 @@ const os = require('os');
 const HOME = os.homedir();
 const BRIDGE_DIR = `${HOME}/tcc-bridge`;
 const LOG_DIR = `${BRIDGE_DIR}/logs`;
+const SOVEREIGNTY_DIR = `${BRIDGE_DIR}/sovereignty`;
 const TUNNEL_UUID = '18ba1a49-fdf9-4a52-a27a-5250d397c5c5';
 
 module.exports = {
   apps: [
-    // ── 1. TCC Bridge API (bridge.py) ──────────────────────────────────────
+    {
+      name: 'kael-sovereignty',
+      script: `${SOVEREIGNTY_DIR}/run_kael.sh`,
+      interpreter: '/bin/bash',
+      cwd: SOVEREIGNTY_DIR,
+      autorestart: true,
+      max_restarts: 100,
+      restart_delay: 5000,
+      kill_timeout: 3000,
+      shutdown_with_message: true,
+    },
+    {
+      name: 'chris-sovereignty',
+      script: `${SOVEREIGNTY_DIR}/run_chris.sh`,
+      interpreter: '/bin/bash',
+      cwd: SOVEREIGNTY_DIR,
+      autorestart: true,
+      max_restarts: 100,
+      restart_delay: 5000,
+      kill_timeout: 3000,
+      shutdown_with_message: true,
+    },
+    // ââ 1. TCC Bridge API (bridge.py) ââââââââââââââââââââââââââââââââââââââ
     {
       name: 'tcc-bridge',
       script: `${BRIDGE_DIR}/bridge.py`,
@@ -31,7 +54,7 @@ module.exports = {
       merge_logs: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
 
-      // Environment — CORRECTED PORT AND SUPABASE
+      // Environment â CORRECTED PORT AND SUPABASE
       env: {
         PYTHONUNBUFFERED: '1',
         BRIDGE_PORT: '8765',
@@ -43,7 +66,7 @@ module.exports = {
       },
     },
 
-    // ── 2. State Push Worker (state-push.py) ───────────────────────────────
+    // ââ 2. State Push Worker (state-push.py) âââââââââââââââââââââââââââââââ
     {
       name: 'tcc-state-push',
       script: `${BRIDGE_DIR}/state-push.py`,
@@ -67,7 +90,7 @@ module.exports = {
       },
     },
 
-    // ── 3. Cloudflare Tunnel ───────────────────────────────────────────────
+    // ââ 3. Cloudflare Tunnel âââââââââââââââââââââââââââââââââââââââââââââââ
     {
       name: 'tcc-cloudflared',
       script: 'cloudflared',
@@ -86,7 +109,7 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
     },
 
-    // ── 4. Watchdog ────────────────────────────────────────────────────────
+    // ââ 4. Watchdog ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     {
       name: 'tcc-watchdog',
       script: `${BRIDGE_DIR}/watchdog.sh`,
