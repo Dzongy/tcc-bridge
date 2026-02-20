@@ -1,5 +1,4 @@
 #!/bin/bash
-# run_chris.sh â TCC Sovereignty Wrapper
 trap "" INT
 cd /data/data/com.termux/files/home/tcc-bridge/sovereignty
 exec python3 -c "
