@@ -1,15 +1,9 @@
 #!/bin/bash
-# Zenith Bridge Cron Script
-PIDFILE="/tmp/zenith_bridge.pid"
+# Bridge v2 Push State Cron Job
 
-if [ -f "$PIDFILE" ]; then
-    PID=$(cat "$PIDFILE")
-    if ps -p "$PID" > /dev/null; then
-        echo "Bridge already running."
-        exit 1
-    fi
-fi
+# Navigate to script directory
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$DIR"
 
-echo $$ > "$PIDFILE"
-python3 ~/bridge_v2.py
-rm "$PIDFILE"
+# Run the bridge script
+python3 bridge_v2.py >> bridge.log 2>&1
