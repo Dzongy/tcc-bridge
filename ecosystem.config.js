@@ -11,7 +11,7 @@ module.exports = {
       kill_timeout: 3000,
       shutdown_with_message: true,
       env: {
-        PYTHONPATH: '.'
+        PYTHONPATH: '/data/data/com.termux/files/home/tcc-bridge'
       }
     },
     {
@@ -25,7 +25,7 @@ module.exports = {
       kill_timeout: 3000,
       shutdown_with_message: true,
       env: {
-        PYTHONPATH: '.'
+        PYTHONPATH: '/data/data/com.termux/files/home/tcc-bridge'
       }
     }
   ]
