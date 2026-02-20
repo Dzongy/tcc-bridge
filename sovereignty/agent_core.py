@@ -13,7 +13,7 @@ from sovereignty.brain_router import BrainRouter
 
 
 class Kael:
-    """Kael â sovereign autonomous agent. The keeper, the builder."""
+    """Kael — sovereign autonomous agent. The keeper, the builder."""
 
     def __init__(self):
         self.boot_time = datetime.now().isoformat()
@@ -25,7 +25,7 @@ class Kael:
         self._init_memory()
         self._log_event("boot", {"version": "3.0", "brain": self.brain.status()})
         self._write_outbox({"msg": "Kael sovereign core v3.0 online", "from": "kael"})
-        print(f"[KAEL] Sovereign core v3.0 online â {self.boot_time}")
+        print(f"[KAEL] Sovereign core v3.0 online — {self.boot_time}")
         print(f"[KAEL] Brain: {'ACTIVE' if self.brain.alive else 'OFFLINE'}")
         print(f"[KAEL] Inbox: {INBOX}")
         print(f"[KAEL] ntfy: {NTFY_TOPIC}")
@@ -183,7 +183,7 @@ class Kael:
         return actions
 
     def handle_message(self, text, sender="unknown", source="mailbox"):
-        """Process any incoming message â from mailbox, ntfy, or internal."""
+        """Process any incoming message — from mailbox, ntfy, or internal."""
         self.message_count += 1
         self._log_event("msg_in", {"text": text[:200], "from": sender, "source": source})
         msg = text.strip().lower()
@@ -203,6 +203,8 @@ class Kael:
             result = self._exec_shell(cmd)
             self._log_event("sh", {"cmd": cmd, "code": result["code"]})
             return self._respond(f"Exit {result['code']}\n{result['stdout'][:1000]}", sender)
+        elif msg.startswith("read:"):
+            return self._respond_read(text[5:].strip(), sender)
         elif msg.startswith("read:"):
             return self._respond_read(text[5:].strip(), sender)
         elif msg.startswith("write:"):
@@ -293,7 +295,7 @@ class Kael:
                     text = inbox.get("msg") or inbox.get("text") or json.dumps(inbox)
                     sender = inbox.get("from", "mailbox")
                     result = self.handle_message(text, sender, "mailbox")
-                    print(f"[KAEL] Mailbox: {text[:80]} â {str(result.get('msg', ''))[:80]}")
+                    print(f"[KAEL] Mailbox: {text[:80]} → {str(result.get('msg', ''))[:80]}")
 
                 # 2. Check ntfy
                 ntfy_msgs = self._poll_ntfy()
@@ -302,7 +304,7 @@ class Kael:
                         text = nm.get("message", "")
                         if text:
                             result = self.handle_message(text, "ntfy", "ntfy")
-                            print(f"[KAEL] ntfy: {text[:80]} â {str(result.get('msg', ''))[:80]}")
+                            print(f"[KAEL] ntfy: {text[:80]} → {str(result.get('msg', ''))[:80]}")
                             # Echo response back to ntfy so Commander sees it
                             self._publish_ntfy(str(result.get("msg", ""))[:500], title="Kael")
 
@@ -316,7 +318,7 @@ class Kael:
 
             except KeyboardInterrupt:
                 self._log_event("shutdown", {"reason": "manual"})
-                print("[KAEL] Shutdown â sovereignty persists.")
+                print("[KAEL] Shutdown — sovereignty persists.")
                 break
             except Exception as e:
                 self._log_event("error", {"error": str(e)})
