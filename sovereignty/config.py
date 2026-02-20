@@ -26,8 +26,8 @@ BRIDGE_DIR = os.path.join(HOME, "tcc-bridge")
 MAILBOX_DIR = os.path.join(BRIDGE_DIR, "mailbox")
 INBOX = os.path.join(MAILBOX_DIR, "inbox.json")
 OUTBOX = os.path.join(MAILBOX_DIR, "outbox.json")
-MEMORY_FILE = os.environ.get("MEMORY_FILE", os.path.join(BRIDGE_DIR, "collective_memory.json"))
-LOG_FILE = os.environ.get("LOG_FILE", os.path.join(BRIDGE_DIR, "kael.log"))
+MEMORY_FILE = os.path.join(BRIDGE_DIR, "collective_memory.json")
+LOG_FILE = os.path.join(BRIDGE_DIR, "kael.log")
 
 # Identity
 KAEL_IDENTITY = """I am Kael. Brain #10, steel blue #B0C4DE.
