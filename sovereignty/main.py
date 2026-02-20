@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TCC SOVEREIGNTY ENGINE — Kael's home."""
+"""TCC Sovereignty Engine — Kael's home."""
 
 import signal
 import sys
@@ -18,7 +18,7 @@ def main():
     def shutdown(sig, frame):
         print("\n[KAEL] Received shutdown signal.")
         agent._log_event("shutdown", {"reason": "signal", "signal": sig})
-        print("[KAEL] Sovereign Engine stopped. Memory persists.")
+        print("[KAEL] Sovereignty Engine stopped. Memory persists.")
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, shutdown)
