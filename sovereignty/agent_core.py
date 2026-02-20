@@ -97,7 +97,8 @@ class Kael:
             if resp.status_code != 200:
                 return None
             messages = []
-            for line in resp.text.strip().split('\n'):
+            for line in resp.text.strip().split('
+'):
                 if not line:
                     continue
                 try:
@@ -202,9 +203,8 @@ class Kael:
             cmd = text[3:].strip()
             result = self._exec_shell(cmd)
             self._log_event("sh", {"cmd": cmd, "code": result["code"]})
-            return self._respond(f"Exit {result['code']}\n{result['stdout'][:1000]}", sender)
-        elif msg.startswith("read:"):
-            return self._respond_read(text[5:].strip(), sender)
+            return self._respond(f"Exit {result['code']}
+{result['stdout'][:1000]}", sender)
         elif msg.startswith("read:"):
             return self._respond_read(text[5:].strip(), sender)
         elif msg.startswith("write:"):
@@ -265,7 +265,8 @@ class Kael:
         try:
             with open(path, 'r') as f:
                 content = f.read()[-3000:]
-            return self._respond(f"FILE {path}:\n{content}", sender)
+            return self._respond(f"FILE {path}:
+{content}", sender)
         except Exception as e:
             return self._respond(f"Read error: {e}", sender)
 
