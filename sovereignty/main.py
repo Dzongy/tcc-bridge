@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""TCC Sovereignty Engine — Kael's home."""
-
+"""TCC Sovereignty EngKAEL's home."""
 import signal
 import sys
 from sovereignty.agent_core import Kael
