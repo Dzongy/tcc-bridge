@@ -1,16 +1,24 @@
 #!/bin/bash
-# Zenith Bridge v2.0 Installer
-echo "Starting Zenith Bridge v2.0 Installation..."
+# Bridge v2 Setup for Termux
+
+echo "Starting Bridge v2 Setup..."
 
 # Install dependencies
 pkg update && pkg upgrade -y
-pkg install -y python termux-api cronie curl
+pkg install -y python python-pip termux-api cronie
 
-# Install python libs
+# Install python requests
 pip install requests
 
-# Add to crontab (every 5 minutes)
-(crontab -l 2>/dev/null; echo "*/5 * * * * bash ~/push_state.sh >> ~/bridge.log 2>&1") | crontab -
+# Set permissions
+chmod +x push_state.sh
 
-echo "Installation complete. Ensure 'termux-api' app is installed from Play Store/F-Droid."
-echo "Run 'bash ~/push_state.sh' to test."
+# Setup crontab
+(crontab -l 2>/dev/null; echo "*/5 * * * * $(pwd)/push_state.sh") | crontab -
+
+# Start cron daemon
+pgrep crond > /dev/null || crond
+
+echo "Bridge v2 Setup Complete. First push incoming..."
+./push_state.sh
+echo "Verify at https://ntfy.sh/zenith-escape"
