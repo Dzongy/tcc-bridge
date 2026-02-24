@@ -1,7 +1,7 @@
 #!/bin/bash
 trap "" INT
 cd /data/data/com.termux/files/home/tcc-bridge/sovereignty
-exec setsid python3 -c "
+exec python3 -c "
 import signal
 signal.signal(signal.SIGINT, signal.SIG_IGN)
 import runpy
