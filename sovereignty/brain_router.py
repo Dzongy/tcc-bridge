@@ -38,7 +38,7 @@ class BrainRouter:
         return requests
 
     def status(self):
-        return {"alive", self.alive, "brains": list(BRAINS.keys())}
+        return {"alive": self.alive, "brains": list(BRAINS.keys())}
 
     def _call_brain(self, brain_id, prompt, system):
         req = self._get_requests()
