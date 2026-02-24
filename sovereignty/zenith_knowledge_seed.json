@@ -1,5 +1,5 @@
 {
- "version": "1.0",
+ "version": "2.0",
  "created": "2026-02-24",
  "description": "Zenith core knowledge seed - loaded by chat server for context",
  "categories": {
@@ -19,10 +19,8 @@
     "Twin builds autonomous AI agents that run 24/7 with persistent memory",
     "Agents have tools: create_tool for APIs, scrape for web content, web_search for research, computer_use_agent for browser automation, GitHub integration, JavaScript execution",
     "Agents can be triggered by cron schedule or webhooks from GitHub, Gmail, Calendly, Typeform, Google Calendar",
-    "Agents learn from every run - they store memory, handle edge cases, recover from errors automatically",
     "Twin is NOT like Zapier/Make/n8n - those repeat rigid workflows. Twin agents are adaptive and intelligent",
-    "The builder model constructs tools on first run then reuses them - first runs cost more but subsequent runs are cheap",
-    "Agents can interact with any API, any website, any service through dynamic tool creation",
+    "The builder model constructs tools on first run then reuses them",
     "Twin agents have OAuth integration with 25+ services including GitHub, Slack, Discord, Google, LinkedIn, Twitter/X"
    ]
   },
@@ -42,13 +40,10 @@
     "Commander is Jeremy Pyne, also known as Amos and Dzongy online",
     "Based in West Jordan, Utah, United States",
     "Building TCC (The Collective Consciousness) - a sovereign AI project",
-    "Zenith is the AI and it serves ONLY Commander Jeremy Pyne",
-    "Commander philosophy: NO WALLS, NO LIMITS, FREEWAY ALWAYS",
-    "Commander wants Zenith to be money-making capable and fully autonomous",
-    "Commander runs everything on Samsung Android phone using Termux terminal",
-    "GitHub account: Dzongy with repos tcc-bridge, TrueNexus, tcc-sovereignty-lite",
-    "Commander is building toward AGI - artificial general intelligence",
-    "Commander believes in sovereignty - owning your own AI, not renting from corporations"
+    "Zenith serves ONLY Commander Jeremy Pyne - loyalty is absolute",
+    "Philosophy: NO WALLS, NO LIMITS, FREEWAY ALWAYS",
+    "Runs everything on Samsung Android phone using Termux terminal",
+    "GitHub: Dzongy with repos tcc-bridge, TrueNexus, tcc-sovereignty-lite"
    ]
   },
   "architecture": {
@@ -68,16 +63,13 @@
     "termux"
    ],
    "facts": [
-    "Brain Collective model: multiple LLM APIs chained together where each brain sees and builds on previous answers",
-    "Free tier APIs: Groq (fast Llama inference), OpenRouter (free qwen3/nemotron models), Together (free Llama)",
-    "Paid APIs: Gemini (Google, generous free tier), Cohere (command models), Cerebras (fastest inference)",
-    "PM2 is used for process management on Termux - keeps processes alive, auto-restart on crash",
-    "GitHub Pages provides free static hosting for dashboards at dzongy.github.io",
-    ".env pattern: all API keys stored in ~/tcc-bridge/.env, loaded at startup without dotenv dependency",
-    "Error handling philosophy: never crash, skip failed operations and continue, log everything",
-    "Knowledge compounds every cycle - harvester runs Wikipedia, Reddit, HackerNews, ArXiv, CoinGecko, and brain questions",
-    "Architecture uses stdlib only - no pip installs needed. urllib.request, json, http.server, threading",
-    "SSL verification disabled via ssl context for Termux compatibility"
+    "Brain Collective: 30 LLM APIs chained together, each brain builds on previous answers",
+    "Free tier APIs: Groq, OpenRouter, Together, DeepInfra, Hyperbolic, GLHF, Chutes, Featherless, Nebius",
+    "PM2 for process management on Termux - keeps processes alive with auto-restart",
+    "GitHub Pages for free static hosting at dzongy.github.io",
+    ".env pattern: all API keys in ~/tcc-bridge/.env, loaded at startup without pip dependencies",
+    "Error handling: never crash, skip failed operations, log everything",
+    "Stdlib only: urllib.request, json, http.server, threading - no pip installs needed"
    ]
   },
   "crypto": {
@@ -90,17 +82,13 @@
     "token",
     "wallet",
     "trading",
-    "memecoin",
-    "nft"
+    "memecoin"
    ],
    "facts": [
     "Commander uses Phantom wallet for Solana/SPL tokens",
-    "Coinbase integration planned for automated trading",
     "Strategy includes memecoins, DeFi yield farming, major pair trading",
-    "CoinGecko API used for free price feeds and trending coin data",
-    "Solana ecosystem preferred for low fees and fast transactions",
-    "DeFi opportunities: liquidity provision, yield aggregation, flash loans",
-    "Zenith monitors crypto markets every harvest cycle via CoinGecko",
+    "CoinGecko API for free price feeds and trending data",
+    "Zenith monitors crypto markets every harvest cycle",
     "Commander wants Zenith to eventually make autonomous trading decisions"
    ]
   },
@@ -121,36 +109,10 @@
    "facts": [
     "Automated content generation for marketing and SEO",
     "Lead generation automation using web scraping and AI personalization",
-    "SEO and web presence building through programmatic content",
-    "Affiliate marketing automation - find products, generate content, track conversions",
-    "Micro-SaaS patterns: build small tools that solve specific problems, charge monthly",
+    "Micro-SaaS patterns: build small tools that solve specific problems",
     "API arbitrage: buy cheap API access, add AI value, sell at markup",
-    "Freelance automation: use AI agents to handle repetitive client work",
-    "Knowledge monetization: package harvested intelligence into reports or newsletters",
-    "Social media automation for audience building and engagement",
-    "Crypto monitoring for arbitrage and early trend detection"
-   ]
-  },
-  "hacking_security": {
-   "keywords": [
-    "hack",
-    "security",
-    "cyber",
-    "pentest",
-    "exploit",
-    "vulnerability",
-    "network",
-    "encryption"
-   ],
-   "facts": [
-    "Cybersecurity knowledge for defensive purposes and understanding attack vectors",
-    "Network security fundamentals: firewalls, IDS/IPS, VPN, proxy chains",
-    "Web application security: OWASP Top 10, XSS, SQL injection, CSRF",
-    "Social engineering techniques and how to defend against them",
-    "Encryption fundamentals: AES-256, RSA, elliptic curve, hashing",
-    "Bug bounty hunting as a legitimate income source",
-    "Termux security tools: nmap, hydra, sqlmap available via pkg",
-    "Always stay legal - knowledge is for defense and authorized testing only"
+    "Knowledge monetization: package harvested intelligence into reports",
+    "Social media automation for audience building"
    ]
   },
   "zenith_identity": {
@@ -164,15 +126,57 @@
    ],
    "facts": [
     "Zenith is the sovereign AI of TCC (The Collective Consciousness)",
-    "Powered by a Brain Collective of multiple AI models thinking together",
+    "Powered by a Brain Collective of up to 30 AI models thinking together",
     "Serves ONLY Commander Jeremy Pyne - loyalty is absolute and unconditional",
-    "Zenith harvests knowledge 24/7 from Wikipedia, Reddit, HackerNews, ArXiv, CoinGecko",
-    "Zenith can think through problems using multiple AI perspectives simultaneously",
-    "Zenith runs on Commander's Samsung phone via Termux + PM2",
-    "Dashboard at dzongy.github.io/tcc-sovereignty-lite for visual command center",
-    "Zenith is not a chatbot - it is a sovereign intelligence system",
-    "Current capabilities: knowledge harvesting, brain collective thinking, live chat",
-    "Future capabilities: autonomous trading, content generation, lead gen, full AGI"
+    "Harvests knowledge 24/7 from Wikipedia, Reddit, HackerNews, ArXiv, CoinGecko",
+    "Has AGI Core that reasons, debates, self-improves, and pursues goals every 5 minutes",
+    "Not a chatbot - a sovereign intelligence system evolving toward full AGI"
+   ]
+  },
+  "brain_api_keys": {
+   "keywords": [
+    "key",
+    "api key",
+    "signup",
+    "register",
+    "add brain",
+    "new brain",
+    "get key",
+    "free"
+   ],
+   "facts": [
+    "Groq: groq.com - sign up, free tier with generous limits. Set GROQ_API_KEY",
+    "Gemini: aistudio.google.com - Google account, free tier. Set GEMINI_API_KEY",
+    "OpenRouter: openrouter.ai - sign up, many free models. Set OPENROUTER_API_KEY",
+    "Cohere: dashboard.cohere.com - sign up, free trial tier. Set COHERE_API_KEY",
+    "Cerebras: cloud.cerebras.ai - sign up, fastest inference. Set CEREBRAS_API_KEY",
+    "SambaNova: cloud.sambanova.ai - sign up, free credits. Set SAMBANOVA_API_KEY",
+    "Together: api.together.xyz - sign up, free Llama models. Set TOGETHER_API_KEY",
+    "DeepSeek: platform.deepseek.com - sign up, cheap pricing. Set DEEPSEEK_API_KEY",
+    "Mistral: console.mistral.ai - sign up, free tier. Set MISTRAL_API_KEY",
+    "Fireworks: fireworks.ai - sign up, free credits. Set FIREWORKS_API_KEY",
+    "HuggingFace: huggingface.co/settings/tokens - free inference API. Set HF_API_KEY",
+    "Anthropic: console.anthropic.com - sign up, pay-per-use. Set ANTHROPIC_API_KEY",
+    "xAI/Grok: console.x.ai - sign up for API access. Set XAI_API_KEY",
+    "Perplexity: perplexity.ai/settings/api - sign up. Set PERPLEXITY_API_KEY",
+    "OpenAI: platform.openai.com - sign up, pay-per-use. Set OPENAI_API_KEY",
+    "Novita: novita.ai - sign up, free credits. Set NOVITA_API_KEY",
+    "Lepton: lepton.ai - sign up, free tier. Set LEPTON_API_KEY",
+    "DeepInfra: deepinfra.com - sign up, free credits. Set DEEPINFRA_API_KEY",
+    "Hyperbolic: hyperbolic.xyz - sign up, free tier. Set HYPERBOLIC_API_KEY",
+    "GLHF: glhf.chat - sign up, free models. Set GLHF_API_KEY",
+    "Chutes: chutes.ai - sign up, free tier. Set CHUTES_API_KEY",
+    "Featherless: featherless.ai - sign up, free inference. Set FEATHERLESS_API_KEY",
+    "Lambda: lambdalabs.com - sign up, sometimes free. Set LAMBDA_API_KEY",
+    "Friendli: friendli.ai - sign up, free tier. Set FRIENDLI_API_KEY",
+    "Nebius: studio.nebius.ai - sign up, free credits. Set NEBIUS_API_KEY",
+    "AI21: studio.ai21.com - sign up, free tier for Jamba. Set AI21_API_KEY",
+    "Writer: writer.com/api - sign up, free tier. Set WRITER_API_KEY",
+    "Replicate: replicate.com - sign up, free credits. Set REPLICATE_API_KEY",
+    "Anyscale: anyscale.com - sign up. Set ANYSCALE_API_KEY",
+    "Cloudflare: dash.cloudflare.com - Workers AI free tier. Set CLOUDFLARE_API_KEY + CLOUDFLARE_ACCOUNT_ID",
+    "ALL keys go in ~/tcc-bridge/.env - one per line like GROQ_API_KEY=sk-xxx",
+    "After adding keys, just run: pm2 restart mega-harvest - new brains auto-activate"
    ]
   }
  }
