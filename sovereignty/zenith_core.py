@@ -1,6 +1,12 @@
+import signal
+import os
+import sys
+
+# Ignore SIGINT immediately to prevent PM2 crash loop
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+
 import json
 import time
-import os
 import requests
 from brain_router import BrainRouter
 
