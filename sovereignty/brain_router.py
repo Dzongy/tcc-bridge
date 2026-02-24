@@ -1,4 +1,4 @@
-import os, json, random, requests, time
+import os, json, random, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load .env file
