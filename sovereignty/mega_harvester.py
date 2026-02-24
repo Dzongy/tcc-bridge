@@ -51,6 +51,7 @@ CTX.verify_mode = ssl.CERT_NONE
 # Each brain: (name, env_key, base_url, model, special_type)
 # special_type: "openai" (standard), "gemini", "cohere", "anthropic"
 BRAIN_DEFS = [
+ # --- Original 16 brains ---
  ("grok", "XAI_API_KEY", "https://api.x.ai/v1/chat/completions", "grok-3-mini-beta", "openai"),
  ("groq", "GROQ_API_KEY", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile", "openai"),
  ("gemini", "GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent", None, "gemini"),
@@ -66,6 +67,22 @@ BRAIN_DEFS = [
  ("openai", "OPENAI_API_KEY", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini", "openai"),
  ("huggingface", "HF_API_KEY", "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3/v1/chat/completions", "mistralai/Mistral-7B-Instruct-v0.3", "openai"),
  ("anthropic", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/messages", "claude-3-5-haiku-20241022", "anthropic"),
+ # --- NEW: 15 additional brains (all OpenAI-compatible) ---
+ ("novita", "NOVITA_API_KEY", "https://api.novita.ai/v3/openai/chat/completions", "meta-llama/llama-3.1-70b-instruct", "openai"),
+ ("lepton", "LEPTON_API_KEY", "https://llama3-1-70b.lepton.run/api/v1/chat/completions", "llama-3.1-70b", "openai"),
+ ("deepinfra", "DEEPINFRA_API_KEY", "https://api.deepinfra.com/v1/openai/chat/completions", "meta-llama/Llama-3.3-70B-Instruct", "openai"),
+ ("hyperbolic", "HYPERBOLIC_API_KEY", "https://api.hyperbolic.xyz/v1/chat/completions", "meta-llama/Llama-3.3-70B-Instruct", "openai"),
+ ("glhf", "GLHF_API_KEY", "https://glhf.chat/api/openai/v1/chat/completions", "hf:meta-llama/Llama-3.3-70B-Instruct", "openai"),
+ ("chutes", "CHUTES_API_KEY", "https://api.chutes.ai/v1/chat/completions", "meta-llama/Llama-3.3-70B-Instruct", "openai"),
+ ("featherless", "FEATHERLESS_API_KEY", "https://api.featherless.ai/v1/chat/completions", "meta-llama/Llama-3.3-70B-Instruct", "openai"),
+ ("lambda", "LAMBDA_API_KEY", "https://api.lambdalabs.com/v1/chat/completions", "llama-3.3-70b-instruct", "openai"),
+ ("friendli", "FRIENDLI_API_KEY", "https://inference.friendli.ai/v1/chat/completions", "meta-llama-3.1-70b-instruct", "openai"),
+ ("nebius", "NEBIUS_API_KEY", "https://api.studio.nebius.ai/v1/chat/completions", "meta-llama/Llama-3.3-70B-Instruct", "openai"),
+ ("ai21", "AI21_API_KEY", "https://api.ai21.com/studio/v1/chat/completions", "jamba-1.5-mini", "openai"),
+ ("writer", "WRITER_API_KEY", "https://api.writer.com/v1/chat", "palmyra-x-004", "openai"),
+ ("replicate", "REPLICATE_API_KEY", "https://api.replicate.com/v1/chat/completions", "meta/meta-llama-3-70b-instruct", "openai"),
+ ("anyscale", "ANYSCALE_API_KEY", "https://api.endpoints.anyscale.com/v1/chat/completions", "meta-llama/Llama-3.3-70b-chat-hf", "openai"),
+ ("cloudflare", "CLOUDFLARE_API_KEY", "https://api.cloudflare.com/client/v4/accounts/CLOUDFLARE_ACCOUNT_ID/ai/v1/chat/completions", "@cf/meta/llama-3.1-70b-instruct", "openai"),
 ]
 
 
