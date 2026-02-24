@@ -266,7 +266,8 @@ def generate_followups(router, domain, existing_questions):
  for q in existing_questions[-10:]:
   prompt += f"- {q}\n"
  try:
-  provider, answer = router.think(prompt)
+  answer = router.think(prompt)
+  provider = router.available[0] if router.available else "unknown"
   if not answer:
    return []
   # Try to parse JSON array from response
@@ -344,9 +345,10 @@ def main():
    short_q = question[:50] + "..." if len(question) > 50 else question
 
    try:
-    provider, answer = router.think(question)
+    answer = router.think(question)
+    provider = router.available[0] if router.available else "unknown"
 
-    if not provider or not answer:
+    if not answer:
      print(f"[SKIP] Q{i}/{total_q} | No response | {short_q}")
      stats["errors"] += 1
      time.sleep(REQUEST_DELAY)
