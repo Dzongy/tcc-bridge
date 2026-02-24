@@ -1,5 +1,5 @@
 """
-brain_router.py â TCC Sovereignty Hive Brain Router v6.0
+brain_router.py -- TCC Sovereignty Hive Brain Router v6.0
 6-provider AI router with .env loading, single-brain routing, and consensus mode.
 """
 
@@ -10,9 +10,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-# âââ .env loader âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# --- .env loader -----------------------------------------------------------
+
 def _load_env():
-    """Load .env from ~/tcc-bridge/.env â tries python-dotenv first, falls back to manual."""
+    """Load .env from ~/tcc-bridge/.env -- tries python-dotenv first, falls back to manual."""
     env_file = os.path.join(os.path.expanduser("~"), "tcc-bridge", ".env")
     try:
         from dotenv import load_dotenv
@@ -27,74 +28,65 @@ def _load_env():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k and k not in os.environ:
-                os.environ[k] = v
+            key, val = line.split("=", 1)
+            os.environ.setdefault(key.strip(), val.strip())
 
 _load_env()
 
-# âââ Brain definitions âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# --- Brain definitions ------------------------------------------------------
+
 BRAINS = {
     "groq": {
-        "name": "Groq Llama 3.3 70B",
         "url": "https://api.groq.com/openai/v1/chat/completions",
-        "key_env": "GROQ_API_KEY",
         "model": "llama-3.3-70b-versatile",
+        "key_env": "GROQ_API_KEY",
         "style": "openai",
     },
     "gemini": {
-        "name": "Gemini 2.0 Flash",
-        "url": "gemini",
-        "key_env": "GEMINI_API_KEY",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
         "model": "gemini-2.0-flash",
+        "key_env": "GEMINI_API_KEY",
         "style": "gemini",
     },
     "cohere": {
-        "name": "Cohere Command R+",
         "url": "https://api.cohere.com/v2/chat",
-        "key_env": "COHERE_API_KEY",
         "model": "command-r-plus",
+        "key_env": "COHERE_API_KEY",
         "style": "cohere",
     },
     "openrouter": {
-        "name": "OpenRouter DeepSeek V3",
         "url": "https://openrouter.ai/api/v1/chat/completions",
-        "key_env": "OPENROUTER_API_KEY",
         "model": "deepseek/deepseek-chat-v3-0324:free",
+        "key_env": "OPENROUTER_API_KEY",
         "style": "openai",
     },
     "cerebras": {
-        "name": "Cerebras Llama 3.3 70B",
         "url": "https://api.cerebras.ai/v1/chat/completions",
-        "key_env": "CEREBRAS_API_KEY",
         "model": "llama-3.3-70b",
+        "key_env": "CEREBRAS_API_KEY",
         "style": "openai",
     },
     "sambanova": {
-        "name": "SambaNova Llama 3.1 70B",
         "url": "https://api.sambanova.ai/v1/chat/completions",
-        "key_env": "SAMBANOVA_API_KEY",
         "model": "Meta-Llama-3.1-70B-Instruct",
+        "key_env": "SAMBANOVA_API_KEY",
         "style": "openai",
     },
 }
 
-# âââ API call helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# --- Helper functions -------------------------------------------------------
+
 def _build_messages(prompt, context=None):
-    """Convert prompt (string or list-of-dicts) into OpenAI-style messages list."""
-    if isinstance(prompt, list):
-        return prompt
+    """Build a standard messages list for chat APIs."""
     msgs = []
     if context:
-        msgs.append({"role": "system", "content": str(context)})
-    msgs.append({"role": "user", "content": str(prompt)})
+        msgs.append({"role": "system", "content": context})
+    msgs.append({"role": "user", "content": prompt})
     return msgs
 
 
-def _call_openai_style(url, key, model, messages, temp):
-    """Call an OpenAI-compatible chat completions endpoint."""
+def _call_openai_style(url, key, model, messages, temp=0.7):
+    """Call an OpenAI-compatible chat endpoint."""
     body = json.dumps({
         "model": model,
         "messages": messages,
@@ -103,31 +95,28 @@ def _call_openai_style(url, key, model, messages, temp):
     req = Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Authorization", f"Bearer {key}")
-    with urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read())
+    resp = urlopen(req, timeout=30)
+    data = json.loads(resp.read())
     return data["choices"][0]["message"]["content"]
 
 
-def _call_gemini(key, model, messages, temp):
+def _call_gemini(url, key, messages, temp=0.7):
     """Call the Gemini generateContent endpoint."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-    parts = []
-    for m in messages:
-        parts.append({"text": m["content"]})
+    parts = [{"text": m["content"]} for m in messages]
     body = json.dumps({
         "contents": [{"parts": parts}],
         "generationConfig": {"temperature": temp},
     }).encode()
-    req = Request(url, data=body, method="POST")
+    full_url = f"{url}?key={key}"
+    req = Request(full_url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
-    with urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read())
+    resp = urlopen(req, timeout=30)
+    data = json.loads(resp.read())
     return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def _call_cohere(key, model, messages, temp):
+def _call_cohere(url, key, messages, model, temp=0.7):
     """Call the Cohere v2 chat endpoint."""
-    url = "https://api.cohere.com/v2/chat"
     body = json.dumps({
         "model": model,
         "messages": messages,
@@ -136,88 +125,80 @@ def _call_cohere(key, model, messages, temp):
     req = Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Authorization", f"Bearer {key}")
-    with urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read())
+    resp = urlopen(req, timeout=30)
+    data = json.loads(resp.read())
     return data["message"]["content"][0]["text"]
 
 
-def _call_brain(brain_id, brain_cfg, messages, temp):
-    """Route a call to the correct brain based on its style."""
-    key = os.environ.get(brain_cfg["key_env"], "")
+def _call_brain(name, prompt, context=None, temp=0.7):
+    """Route a prompt to a specific brain by name."""
+    cfg = BRAINS.get(name)
+    if not cfg:
+        raise ValueError(f"Unknown brain {name}")
+    key = os.environ.get(cfg["key_env"], "")
     if not key:
-        return None
-    style = brain_cfg["style"]
-    try:
-        if style == "openai":
-            return _call_openai_style(brain_cfg["url"], key, brain_cfg["model"], messages, temp)
-        elif style == "gemini":
-            return _call_gemini(key, brain_cfg["model"], messages, temp)
-        elif style == "cohere":
-            return _call_cohere(key, brain_cfg["model"], messages, temp)
-    except Exception as e:
-        print(f"[BrainRouter] {brain_cfg['name']} error: {e}")
-        return None
+        raise ValueError(f"No API key for {name} ({cfg['key_env']})")
+    messages = _build_messages(prompt, context)
+    style = cfg["style"]
+    if style == "openai":
+        return _call_openai_style(cfg["url"], key, cfg["model"], messages, temp)
+    elif style == "gemini":
+        return _call_gemini(cfg["url"], key, messages, temp)
+    elif style == "cohere":
+        return _call_cohere(cfg["url"], key, messages, cfg["model"], temp)
+    else:
+        raise ValueError(f"Unknown style {style}")
 
 
-# âââ BrainRouter class âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# --- BrainRouter class ------------------------------------------------------
+
 class BrainRouter:
-    """Routes prompts through a hive of 6 AI providers."""
+    """Routes prompts to available AI brains."""
 
     def __init__(self):
-        self.brains = {}
-        for bid, cfg in BRAINS.items():
-            key = os.environ.get(cfg["key_env"], "")
-            if key:
-                self.brains[bid] = cfg
-        self.alive = len(self.brains) > 0
-        print(f"[BrainRouter] Initialized â {len(self.brains)}/{len(BRAINS)} brains online")
-        for bid, cfg in self.brains.items():
-            print(f"  â {cfg['name']}")
-        if not self.alive:
-            print("  â  No API keys found â all brains offline")
+        _load_env()
+        self.available = []
+        for name, cfg in BRAINS.items():
+            if os.environ.get(cfg["key_env"], ""):
+                self.available.append(name)
+        self.alive = len(self.available) > 0
 
     def status(self):
-        """Return status dict with alive bool and list of available brains."""
-        return {
-            "alive": self.alive,
-            "brains": [cfg["name"] for cfg in self.brains.values()],
-            "count": len(self.brains),
-        }
+        """Return status dict of all brains."""
+        result = {}
+        for name, cfg in BRAINS.items():
+            has_key = bool(os.environ.get(cfg["key_env"], ""))
+            result[name] = {
+                "model": cfg["model"],
+                "has_key": has_key,
+                "status": "ready" if has_key else "no_key",
+            }
+        return result
 
     def think(self, prompt, context=None, temp=0.7):
-        """Send prompt to the first available brain. Returns response string or None."""
-        if not self.alive:
-            return None
-        messages = _build_messages(prompt, context)
-        for bid, cfg in self.brains.items():
-            result = _call_brain(bid, cfg, messages, temp)
-            if result:
-                return result
-        return None
+        """Send prompt to the first available brain and return its response."""
+        errors = []
+        for name in self.available:
+            try:
+                return _call_brain(name, prompt, context, temp)
+            except Exception as e:
+                errors.append(f"{name}: {e}")
+                continue
+        return f"All brains failed: {'; '.join(errors)}"
 
     def consensus(self, prompt, context=None, temp=0.7):
-        """Query ALL available brains in parallel. Returns list of (name, response) tuples."""
-        if not self.alive:
-            return []
-        messages = _build_messages(prompt, context)
-        results = []
-        with ThreadPoolExecutor(max_workers=len(self.brains)) as pool:
-            futures = {
-                pool.submit(_call_brain, bid, cfg, messages, temp): cfg["name"]
-                for bid, cfg in self.brains.items()
+        """Query all available brains in parallel and return all responses."""
+        results = {}
+        errors = {}
+        with ThreadPoolExecutor(max_workers=len(self.available)) as pool:
+            future_to_brain = {
+                pool.submit(_call_brain, name, prompt, context, temp): name
+                for name in self.available
             }
-            for future in as_completed(futures):
-                name = futures[future]
+            for future in as_completed(future_to_brain):
+                name = future_to_brain[future]
                 try:
-                    resp = future.result()
-                    if resp:
-                        results.append((name, resp))
+                    results[name] = future.result()
                 except Exception as e:
-                    print(f"[BrainRouter] Consensus error from {name}: {e}")
-        return results
-
-
-# âââ Module-level convenience ââââââââââââââââââââââââââââââââââââââââââââââââââ
-if __name__ == "__main__":
-    router = BrainRouter()
-    print(json.dumps(router.status(), indent=2))
+                    errors[name] = str(e)
+        return {"results": results, "errors": errors}
