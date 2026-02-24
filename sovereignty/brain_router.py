@@ -79,7 +79,7 @@ class BrainRouter:
         results = {}
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_bid = {executor.submit(self._call_brain, bid, prompt, system): bid for bid in BRAINS}
-            for future in as_completedf)uture_to_bid):
+            for future in as_completed(future_to_bid):
                 bid = future_to_bid[future]
                 try:
                     result, err = future.result()
