@@ -140,3 +140,14 @@ class BrainRouter:
                 msgs.append({"role": "system", "content": context})
             msgs.append({"role": "user", "content": str(prompt)})
         return consensus(msgs, temp=temp)
+
+
+class BrainRouter:
+    def __init__(self):
+        self.alive = True
+        self.brains = get_available_brains()
+        print(f"[HIVE] {len(self.brains)} brains online: {', '.join(self.brains)}")
+    def think(self, msgs, temp=0.7):
+        return think(msgs, brain="auto", temp=temp)
+    def consensus(self, msgs, temp=0.7):
+        return consensus(msgs, temp=temp)
