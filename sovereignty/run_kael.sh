@@ -1,7 +1,7 @@
 #!/bin/bash
 trap "" INT
 cd /data/data/com.termux/files/home/tcc-bridge/sovereignty
-# Use setsid to run python in a new session, detaching from the caller's process group
+exec python3 -c "
 import signal
 signal.signal(signal.SIGINT, signal.SIG_IGN)
 import runpy
