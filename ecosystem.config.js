@@ -8,8 +8,8 @@ module.exports = {
       autorestart: true,
       max_restarts: 100,
       restart_delay: 5000,
-      kill_timeout: 5000,
-      shutdown_with_message: false,
+      kill_timeout: 3000,
+      shutdown_with_message: true,
       treekill: false,
       env: {
         PYTHONPATH: '/data/data/com.termux/files/home/tcc-bridge/sovereignty'
@@ -23,8 +23,8 @@ module.exports = {
       autorestart: true,
       max_restarts: 100,
       restart_delay: 5000,
-      kill_timeout: 5000,
-      shutdown_with_message: false,
+      kill_timeout: 3000,
+      shutdown_with_message: true,
       treekill: false,
       env: {
         PYTHONPATH: '/data/data/com.termux/files/home/tcc-bridge/sovereignty'
