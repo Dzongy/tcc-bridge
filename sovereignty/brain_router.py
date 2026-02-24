@@ -28,6 +28,7 @@ BRAINS["cohere"] = {"url": "https://api.cohere.com/v2/chat", "key_env": "COHERE_
 BRAINS["openrouter"] = {"url": "https://openrouter.ai/api/v1/chat/completions", "key_env": "OPENROUTER_API_KEY", "model": "deepseek/deepseek-chat-v3-0324:free", "name": "DeepSeek v3"}
 BRAINS["cerebras"] = {"url": "https://api.cerebras.ai/v1/chat/completions", "key_env": "CEREBRAS_API_KEY", "model": "llama-3.3-70b", "name": "Cerebras Llama"}
 BRAINS["sambanova"] = {"url": "https://api.sambanova.ai/v1/chat/completions", "key_env": "SAMBANOVA_API_KEY", "model": "Meta-Llama-3.3-70B-Instruct", "name": "SambaNova Llama"}
+BRAINS["huggingface"] = {"url": "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3", "key_env": "HF_API_KEY", "model": "mistral-7b-v0.3", "name": "HuggingFace Mistral"}
 
 def get_available_brains():
     return [n for n, c in BRAINS.items() if os.environ.get(c["key_env"])]
