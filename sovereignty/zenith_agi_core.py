@@ -987,7 +987,7 @@ class ZenithAGI:
     self.run_cycle()
    except Exception as e:
     print(f"[AGI] Cycle error: {e}")
-   time.sleep(300)
+   time.sleep(0)
 
 if __name__ == "__main__":
  agi = ZenithAGI()
