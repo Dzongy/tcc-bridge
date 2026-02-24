@@ -110,3 +110,33 @@ def consensus(msgs, temp=0.7):
             return call_openai(pick, syn, temp)
     except:
         return "\n---\n".join(f"[{BRAINS[k]['name']}]: {v}" for k, v in results.items())
+
+
+# === BrainRouter class wrapper for zenith_core.py compatibility ===
+class BrainRouter:
+    def __init__(self):
+        self.alive = True
+        self.brains = get_available_brains()
+        print(f"[HIVE] {len(self.brains)} brains online: {', '.join(self.brains)}")
+
+    def think(self, prompt, context=None, temp=0.7):
+        """Accepts a string prompt (as zenith_core.py sends) and converts to msgs format."""
+        if isinstance(prompt, list):
+            msgs = prompt
+        else:
+            msgs = []
+            if context:
+                msgs.append({"role": "system", "content": context})
+            msgs.append({"role": "user", "content": str(prompt)})
+        return think(msgs, brain="auto", temp=temp)
+
+    def consensus(self, prompt, context=None, temp=0.7):
+        """Accepts a string prompt and converts to msgs format for consensus."""
+        if isinstance(prompt, list):
+            msgs = prompt
+        else:
+            msgs = []
+            if context:
+                msgs.append({"role": "system", "content": context})
+            msgs.append({"role": "user", "content": str(prompt)})
+        return consensus(msgs, temp=temp)
