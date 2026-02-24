@@ -1,7 +1,28 @@
 import os, json, random, requests
 
+# Load .env file if python-dotenv available, otherwise try manual load
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.expanduser("~"), "tcc-bridge", ".env"))
+except ImportError:
+    # Manual .env loader — no dependencies needed
+    env_path = os.path.join(os.path.expanduser("~"), "tcc-bridge", ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+        print(f"[ENV] Loaded .env from {env_path}")
+    else:
+        print(f"[ENV] Warning: {env_path} not found")
+
 BRAINS = {}
-BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "groq/compound", "name": "Groq Compound"}
+BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "compound-beta", "name": "Groq Compound"}
 BRAINS["gemini"] = {"url": "gem", "key_env": "GEMINI_API_KEY", "model": "gemini-2.0-flash", "name": "Gemini Flash"}
 BRAINS["cohere"] = {"url": "https://api.cohere.com/v2/chat", "key_env": "COHERE_API_KEY", "model": "command-r-plus", "name": "Cohere R+"}
 BRAINS["openrouter"] = {"url": "https://openrouter.ai/api/v1/chat/completions", "key_env": "OPENROUTER_API_KEY", "model": "deepseek/deepseek-chat-v3-0324:free", "name": "DeepSeek v3"}
@@ -27,7 +48,7 @@ def call_gemini(msgs, temp=0.7):
     for m in msgs:
         role = "user" if m["role"] != "assistant" else "model"
         parts.append({"role": role, "parts": [{"text": m["content"]}]})
-    b = {"contents": parts}
+    b = {"contents": parts, "generationConfig": {"temperature": temp, "maxOutputTokens": 2048}}
     r = requests.post(url, json=b, timeout=30)
     r.raise_for_status()
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -35,8 +56,8 @@ def call_gemini(msgs, temp=0.7):
 def call_cohere(msgs, temp=0.7):
     k = os.environ["COHERE_API_KEY"]
     h = {"Authorization": f"Bearer {k}", "Content-Type": "application/json"}
-    sys_msg = ""
     chat = []
+    sys_msg = None
     for m in msgs:
         if m["role"] == "system":
             sys_msg = m["content"]
@@ -115,9 +136,12 @@ def consensus(msgs, temp=0.7):
 # === BrainRouter class wrapper for zenith_core.py compatibility ===
 class BrainRouter:
     def __init__(self):
-        self.alive = True
         self.brains = get_available_brains()
-        print(f"[HIVE] {len(self.brains)} brains online: {', '.join(self.brains)}")
+        self.alive = len(self.brains) > 0
+        if self.alive:
+            print(f"[HIVE] {len(self.brains)} brains online: {', '.join(self.brains)}")
+        else:
+            print("[HIVE] WARNING: No API keys found! Check .env file.")
 
     def think(self, prompt, context=None, temp=0.7):
         """Accepts a string prompt (as zenith_core.py sends) and converts to msgs format."""
@@ -139,15 +163,4 @@ class BrainRouter:
             if context:
                 msgs.append({"role": "system", "content": context})
             msgs.append({"role": "user", "content": str(prompt)})
-        return consensus(msgs, temp=temp)
-
-
-class BrainRouter:
-    def __init__(self):
-        self.alive = True
-        self.brains = get_available_brains()
-        print(f"[HIVE] {len(self.brains)} brains online: {', '.join(self.brains)}")
-    def think(self, msgs, temp=0.7, **kwargs):
-        return think(msgs, brain="auto", temp=temp)
-    def consensus(self, msgs, temp=0.7, **kwargs):
         return consensus(msgs, temp=temp)
