@@ -2,8 +2,11 @@ import signal
 import os
 import sys
 
-# Ignore SIGINT during startup to prevent PM2 crash loop
+# Ignore SIGINT immediately to prevent PM2 crash loop
 signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+# Ignore SIGINT during startup to prevent PM2 crash loop
 
 import json
 import time
