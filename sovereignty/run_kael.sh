@@ -1,8 +1,7 @@
 #!/bin/bash
 trap "" INT
-
 cd /data/data/com.termux/files/home/tcc-bridge/sovereignty
-# Use setsid to create a new process group
+# Use setsid to create a new process group and ignore SIGINT at both shell and python level
 exec setsid python3 -c "
 import signal
 signal.signal(signal.SIGINT, signal.SIG_IGN)
