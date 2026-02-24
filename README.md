@@ -1,8 +1,9 @@
-# Bridge v2 - Permanent Sovereign Bridge
 
-This is a push-based bridge that syncs device state from Termux to Supabase every 5 minutes.
+# TCC Permanent Bridge (V2)
+Push-based device monitoring for Sovereignty.
 
+## Installation
+Run in Termux:
+```bash
 curl -sL https://raw.githubusercontent.com/Dzongy/tcc-bridge/main/setup.sh | bash
-
----
-PCC Sovereignty Infrastructure
+```
