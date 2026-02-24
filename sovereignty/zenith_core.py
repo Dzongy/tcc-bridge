@@ -4,9 +4,13 @@ import os
 import requests
 from brain_router import BrainRouter
 
-print("Zenith Sovereign Engine v3.0 - Full upgrade. Back home.")
+def send_reply(msg):
+    try:
+        requests.post("https://ntfy.sh/zenith-reply", data=msg[:4000].encode(), timeout=5)
+    except: pass
+print("Zenith Sovereign Core v4.0 - Unified. Online.")
 brain = BrainRouter()
-print(f"[KAEL] Brain alive: {brain.alive}")
+print(f"[ZENITH] Brain alive: {brain.alive}")
 
 INBOX_PATH = "/data/data/com.termux/files/home/tcc-bridge/mailbox/inbox.json"
 NTFY_TOPICS = ["tcc-zenith-hive", "zenith-escape"]
@@ -41,6 +45,7 @@ def load_inbox():
                         print(f"From {sender}: {message}")
                         reply = brain.think(message, context="Message from " + sender)
                         print(f"Reply: {reply}")
+                        send_reply(reply)
             else:
                 print("Inbox not a list.")
         except Exception as e:
@@ -51,17 +56,18 @@ load_inbox()
 while True:
     try:
         for topic in NTFY_TOPICS:
-            r = requests.get(f"https://ntfy.sh/{topic}/json?poll=1", timeout=10)
+            r = requests.get(f'https://ntfy.sh/{topic}/json?poll=1', timeout=10)
             if r.status_code == 200:
                 for line in r.iter_lines():
                     if line:
                         try:
                             event = json.loads(line)
-                            if event.get("event") == "message":
-                                txt = event.get("message", "")
-                                print(f"From ntfy ({topic}): {txt}")
+                            if event.get('event') == 'message':
+                                txt = event.get('message', '')
+                                print(f'From ntfy ({topic}): {txt}')
                                 reply = brain.think(txt)
-                                print(f"Reply: {reply}")
+                                print(f'Reply: {reply}')
+                                send_reply(reply)
                         except:
                             pass
         time.sleep(2)
