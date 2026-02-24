@@ -70,13 +70,16 @@ def load_inbox():
 load_inbox()
 
 # Use since= timestamp for reliable ntfy polling — never miss a message
-last_poll = int(time.time())
+poll_history = {topic: int(time.time()) for topic in NTFY_TOPICS}
+
 
 while True:
     try:
         for topic in NTFY_TOPICS:
             try:
-                r = requests.get(f'https://ntfy.sh/{topic}/json?since={last_poll}', timeout=10)
+                # Use per-topic since timestamp
+                since = poll_history.get(topic, int(time.time()))
+                r = requests.get(f'https://ntfy.sh/{topic}/json?since={since}', timeout=10)
                 if r.status_code == 200:
                     for line in r.iter_lines():
                         if line:
@@ -89,15 +92,13 @@ while True:
                                     reply = brain.think(txt, context=ZENITH_IDENTITY)
                                     print(f'Reply: {reply}')
                                     send_reply(reply)
-                                    # Update timestamp to avoid re-processing
-                                    if msg_time > last_poll:
-                                        last_poll = msg_time
+                                    # Update per-topic timestamp
+                                    if msg_time >= poll_history[topic]:
+                                        poll_history[topic] = msg_time + 1
                             except:
                                 pass
             except Exception as e:
                 print(f"ntfy {topic} error: {e}")
-        # Update poll timestamp for next cycle
-        last_poll = int(time.time())
         time.sleep(3)
     except Exception as e:
         print(f"Scan error: {e}")
