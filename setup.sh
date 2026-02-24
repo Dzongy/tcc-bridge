@@ -1,24 +1,15 @@
-#!/bin/bash
-# Bridge v2 Setup for Termux
 
-echo "Starting Bridge v2 Setup..."
-
-# Install dependencies
+#!/bash/sh
+echo "Initiating Sovereignty Bridge Setup..."
 pkg update && pkg upgrade -y
-pkg install -y python python-pip termux-api cronie
+pkg install -y python ndk-sysroot clang make libjpeg-turbo termux-api cronie
 
-# Install python requests
 pip install requests
 
-# Set permissions
-chmod +x push_state.sh
+mkdir -p ~/tcc-bridge
+cd ~/tcc-bridge
 
-# Setup crontab
-(crontab -l 2>/dev/null; echo "*/5 * * * * $(pwd)/push_state.sh") | crontab -
+# Add to crontab
+(crontab -l ; echo "*/5 * * * * ~/tcc-bridge/push_state.sh") | crontab -
 
-# Start cron daemon
-pgrep crond > /dev/null || crond
-
-echo "Bridge v2 Setup Complete. First push incoming..."
-./push_state.sh
-echo "Verify at https://ntfy.sh/zenith-escape"
+echo "Setup Complete. Permanent Bridge Active."
