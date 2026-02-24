@@ -2,7 +2,8 @@
 trap "" INT
 
 cd /data/data/com.termux/files/home/tcc-bridge/sovereignty
-exec python3 -c "
+# Use setsid to create a new process group
+exec setsid python3 -c "
 import signal
 signal.signal(signal.SIGINT, signal.SIG_IGN)
 import runpy
