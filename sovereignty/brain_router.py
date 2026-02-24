@@ -1,5 +1,5 @@
 import json
-import requests
+# requests import moved inside method to prevent startup crash loop
 from datetime import datetime
 from config import GROQ_API_KEY, GROQ_MODEL, GROQ_URL, GROQ_TIMEOUT, ZENITH_IDENTITY
 
@@ -27,6 +27,7 @@ class BrainRouter:
         messages.append({"role": "user", "content": prompt})
 
         try:
+            import requests
             resp = requests.post(
                 GROQ_URL,
                 headers={
