@@ -174,6 +174,9 @@ RULES_PATH = os.path.join(REPO_DIR, 'zenith_rules.json')
 KB_PATH = os.path.join(REPO_DIR, 'knowledge_base.json')
 META_PATH = os.path.join(REPO_DIR, 'zenith_meta_learning.json')
 STRATEGY_PATH = os.path.join(REPO_DIR, 'zenith_strategies.json')
+ACTION_QUEUE_PATH = os.path.join(REPO_DIR, 'action_queue.json')
+ACTION_RESULTS_PATH = os.path.join(REPO_DIR, 'action_results.json')
+AGI_DECISIONS_PATH = os.path.join(REPO_DIR, 'agi_decisions.json')
 
 # ============================================================
 # MEMORY SYSTEM - Track 10,000 decisions/outcomes
@@ -791,6 +794,91 @@ class ZenithAGI:
   self.improvement = SelfImprovement(BRAINS, self.memory, self.rules)
   self.actions = ActionLayer()
   self.cycle_count = 0
+  self.decisions_log = []
+
+
+ def _write_action_queue(self):
+  queue = {'actions': [], 'processed': 0}
+  try:
+   if os.path.exists(ACTION_QUEUE_PATH):
+    with open(ACTION_QUEUE_PATH, 'r') as f:
+     queue = json.load(f)
+  except Exception:
+   pass
+  # Generate actions from recent decisions
+  recent_decisions = self.memory.get_recent('decisions', 3)
+  decisions_out = []
+  for dec in recent_decisions:
+   decision_text = dec.get('decision', '')
+   context = dec.get('context', '')
+   confidence = dec.get('confidence', 0)
+   # High-confidence decisions become actions
+   if confidence >= 0.6:
+    action_id = hashlib.md5((decision_text + datetime.now().isoformat()).encode()).hexdigest()[:12]
+    # Check if already queued
+    existing_ids = set(a.get('id', '') for a in queue.get('actions', []))
+    if action_id not in existing_ids:
+     action_type = 'research'
+     if 'code' in decision_text.lower() or 'deploy' in decision_text.lower() or 'push' in decision_text.lower():
+      action_type = 'github_deploy'
+     elif 'content' in decision_text.lower() or 'write' in decision_text.lower() or 'blog' in decision_text.lower():
+      action_type = 'generate_content'
+     elif 'crypto' in decision_text.lower() or 'trade' in decision_text.lower() or 'buy' in decision_text.lower():
+      action_type = 'crypto_analysis'
+     queue.get('actions', []).append({
+      'id': action_id,
+      'type': action_type,
+      'topic': context[:200],
+      'query': decision_text[:500],
+      'priority': int(confidence * 100),
+      'status': 'pending',
+      'created_at': datetime.now().isoformat(),
+      'source': 'agi_core'
+     })
+     decisions_out.append({'id': action_id, 'type': action_type, 'decision': decision_text[:200]})
+  # Cap queue size
+  if len(queue.get('actions', [])) > 200:
+   queue['actions'] = queue['actions'][-200:]
+  try:
+   with open(ACTION_QUEUE_PATH, 'w') as f:
+    json.dump(queue, f, indent=1, default=str)
+  except Exception as e:
+   print(f'[AGI] Queue write error: {e}')
+  # Save decisions log
+  if decisions_out:
+   dec_log = {'decisions': [], 'last_update': None}
+   try:
+    if os.path.exists(AGI_DECISIONS_PATH):
+     with open(AGI_DECISIONS_PATH, 'r') as f:
+      dec_log = json.load(f)
+   except Exception:
+    pass
+   dec_log['decisions'].extend(decisions_out)
+   if len(dec_log['decisions']) > 500:
+    dec_log['decisions'] = dec_log['decisions'][-500:]
+   dec_log['last_update'] = datetime.now().isoformat()
+   try:
+    with open(AGI_DECISIONS_PATH, 'w') as f:
+     json.dump(dec_log, f, indent=1, default=str)
+   except Exception:
+    pass
+   print(f'[AGI] Queued {len(decisions_out)} actions for dispatcher')
+
+ def _read_action_results(self):
+  if not os.path.exists(ACTION_RESULTS_PATH):
+   return
+  try:
+   with open(ACTION_RESULTS_PATH, 'r') as f:
+    results = json.load(f)
+   recent = results.get('results', [])[-10:]
+   for r in recent:
+    result_data = r.get('result', {})
+    status = result_data.get('status', 'unknown') if isinstance(result_data, dict) else str(result_data)[:100]
+    self.memory.add_insight('action_results', f"Action {r.get('id', '?')}: {status}")
+   if recent:
+    print(f'[AGI] Read {len(recent)} action results for learning')
+  except Exception as e:
+   print(f'[AGI] Results read error: {e}')
 
  def run_cycle(self):
   self.cycle_count += 1
@@ -871,6 +959,13 @@ class ZenithAGI:
   # 8. Generate new goals
   new_goals = self.improvement.generate_new_goals()
   print(f"[AGI] Generated {new_goals} new goals")
+
+  # 9. Write action queue - dispatch decisions to action layer
+  try:
+   self._write_action_queue()
+   self._read_action_results()
+  except Exception as e:
+   print(f'[AGI] Queue integration error: {e}')
 
   # Save all state
   self.memory.save()
