@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.log
+old_dumps/
+sovereignty.log
+logs/
+*.bak
+*.save
+state.json
+state_backup.json
+.env

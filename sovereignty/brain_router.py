@@ -1,7 +1,7 @@
 import json
 import requests
 from datetime import datetime
-from sovereignty.config import GROQ_API_KEY, GROQ_MODEL, GROQ_URL, GROQ_TIMEOUT, KAEL_IDENTITY
+from config import GROQ_API_KEY, GROQ_MODEL, GROQ_URL, GROQ_TIMEOUT, ZENITH_IDENTITY
 
 class BrainRouter:
     """Routes thinking tasks to Groq LLM. Kael's mind."""
@@ -20,7 +20,7 @@ class BrainRouter:
             return "[brain offline — no GROQ_API_KEY]"
 
         messages = [
-            {"role": "system", "content": KAEL_IDENTITY},
+            {"role": "system", "content": ZENITH_IDENTITY},
         ]
         if context:
             messages.append({"role": "system", "content": f"Context: {context}"})
