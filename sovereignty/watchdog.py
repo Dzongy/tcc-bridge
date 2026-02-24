@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Zenith Health Watchdog v1.0
+Zenith Health Watchdog v1.1
 Infinite loop monitoring all PM2 processes.
 Auto-heals stopped/errored processes, memory leak protection,
 restart flood detection, knowledge_base.json staleness check.
@@ -34,6 +34,10 @@ MANAGED_PROCESSES = {
  },
  "agi": {
   "script": "sovereignty/zenith_agi_core.py",
+  "interpreter": "python3"
+ },
+ "action": {
+  "script": "sovereignty/action_dispatcher.py",
   "interpreter": "python3"
  }
 }
