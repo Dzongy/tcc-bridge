@@ -1,26 +1,32 @@
 module.exports = {
-  apps : [
+  apps: [
     {
-      name : 'kael-sovereignty',
-      script : '/data/data/com.termux/files/home/tcc-bridge/sovereignhy/run_kael.sh',
-      interpreter : '/bin/bash',
-      cwd : '/data/data/com.termux/files/home/tcc-bridge/sovereignty',
-      kill_timeout : 3000,
-      shutdown_with_message : true,
-      autorestart : true,
-      max_restarts : 100,
-      restart_delay : 5000
+      name: 'kael-sovereignty',
+      script: '/data/data/com.termux/files/home/tcc-bridge/sovereignty/run_kael.sh',
+      interpreter: '/bin/bash',
+      cwd: '/data/data/com.termux/files/home/tcc-bridge/sovereignty',
+      autorestart: true,
+      max_restarts: 100,
+      restart_delay: 5000,
+      kill_timeout: 3000,
+      shutdown_with_message: true,
+      env: {
+        PYTHONPATH: '.'
+      }
     },
     {
-      name : 'chris-sovereignty',
-      script : '/bin/bash',
-      args : '/data/data/com.termux/files/home/tcc-bridge/sovereignhy/run_chris.sh',
-      cwd : '/data/data/com.termux/files/home/tcc-bridge/sovereignhy',
-      kill_timeout : 3000,
-      shutdown_with_message : true,
-      autorestart : true,
-      max_restarts : 100,
-      restart_delay : 5000
+      name: 'chris-sovereignty',
+      script: '/data/data/com.termux/files/home/tcc-bridge/sovereignty/run_chris.sh',
+      interpreter: '/bin/bash',
+      cwd: '/data/data/com.termux/files/home/tcc-bridge/sovereignty',
+      autorestart: true,
+      max_restarts: 100,
+      restart_delay: 5000,
+      kill_timeout: 3000,
+      shutdown_with_message: true,
+      env: {
+        PYTHONPATH: '.'
+      }
     }
   ]
-}
+};
