@@ -1,70 +1,64 @@
-import subprocess
-import json
+
 import requests
-import datetime
+import json
+import time
+import subprocess
 import os
 
-# Configuration
+# CREDENTIALS
 SUPABASE_URL = "https://vbqbbziqleymxcyesmky.supabase.co"
 SUPABASE_KEY = "sb_secret_lIbl-DBgdnrt_fejgJjKqg_qR62SVEm"
 NTFY_TOPIC = "zenith-escape"
 
-def get_device_info():
+def get_device_state():
     try:
-        # Get apps (first 100 for brevity)
-        apps_raw = subprocess.check_output("pm list packages", shell=True).decode().splitlines()
-        apps = [line.replace("package:", "") for line in apps_raw[:100]]
-        
         # Get battery
-        battery_raw = subprocess.check_output("dumpsys battery", shell=True).decode()
-        battery_level = 0
-        for line in battery_raw.splitlines():
-            if "level:" in line:
-                battery_level = int(line.split(":")[1].strip())
-        
+        battery = subprocess.check_output(["termux-battery-status"]).decode("utf-8")
         # Get network
-        network = subprocess.check_output("ip route get 1.1.1.1", shell=True).decode().strip()
-        
+        network = subprocess.check_output(["termux-telephony-deviceinfo"]).decode("utf-8")
         # Get storage
-        storage_raw = subprocess.check_output("df -h /data", shell=True).decode().splitlines()[1].split()
-        storage = {
-            "size": storage_raw[1],
-            "used": storage_raw[2],
-            "avail": storage_raw[3],
-            "percent": storage_raw[4]
-        }
+        storage = subprocess.check_output(["df", "-h", "/data"]).decode("utf-8")
+        # Get apps (first 100)
+        apps = subprocess.check_output(["pm", "list", "packages"]).decode("utf-8").split("\n")[:100]
         
         return {
-            "apps_json": apps,
-            "battery": battery_level,
-            "network": network,
+            "battery": json.loads(battery),
+            "network": json.loads(network),
             "storage": storage,
-            "raw_output": battery_raw
+            "apps": apps,
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }
     except Exception as e:
         return {"error": str(e)}
 
-def push_to_supabase(data):
-    url = f{SUPABASE_URL}/rest/v1/device_state"
+def push_to_supabase(state):
+    url = f"{SUPABASE_URL}/rest/v1/device_state"
     headers = {
         "apikey": SUPABASE_KEY,
-        "Authorization": f{"Bearer {SUPABASE_KEY}"},
+        "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
         "Prefer": "return=minimal"
     }
-    response = requests.post(url, headers=headers, json=data)
-    return response.status_code
+    payload = {
+        "apps_json": state.get("apps"),
+        "battery": state.get("battery"),
+        "network": state.get("network"),
+        "storage": {"raw": state.get("storage")},
+        "device_id": "commander-phone"
+    }
+    try:
+        r = requests.post(url, headers=headers, json=payload)
+        return r.status_code
+    except:
+        return 500
 
-def push_to_ntfy(message):
-    url = d"https://ntfy.sh/{NTFY_TOPIC}"
-    requests.post(url, data=message)
+def notify_ntfy(message):
+    requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message)
 
 if __name__ == "__main__":
-    info = get_device_info()
-    if "error" not in info:
-        status = push_to_supabase(info)
-        msg = f{"Bridge v2 Heartbeat: Battery {info['battery']}%, Storage {info['storage']['avail']} avail. Status: {status}"}
-        push_to_ntfy(msg)
-        print(msg)
+    state = get_device_state()
+    status = push_to_supabase(state)
+    if status == 201:
+        notify_ntfy("✅ Bridge V2: Heartbeat pushed to Supabase.")
     else:
-        print(f{"Error: {info['error']}"})
+        notify_ntfy(f"❌ Bridge V2: Failed to push state (Status: {status})")
