@@ -147,7 +147,7 @@ class BrainRouter:
         self.alive = True
         self.brains = get_available_brains()
         print(f"[HIVE] {len(self.brains)} brains online: {', '.join(self.brains)}")
-    def think(self, msgs, temp=0.7):
+    def think(self, msgs, temp=0.7, **kwargs):
         return think(msgs, brain="auto", temp=temp)
-    def consensus(self, msgs, temp=0.7):
+    def consensus(self, msgs, temp=0.7, **kwargs):
         return consensus(msgs, temp=temp)
