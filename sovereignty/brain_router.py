@@ -19,12 +19,12 @@ except ImportError:
                         os.environ[k] = v
 
 BRAINS = {}
-BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "compound-beta", "name": "Groq Compound"}
+BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "llama-3.3-70b-versatile", "name": "Groq Compound"}
 BRAINS["gemini"] = {"url": "gem", "key_env": "GEMINI_API_KEY", "model": "gemini-2.0-flash", "name": "Gemini Flash"}
 BRAINS["cohere"] = {"url": "https://api.cohere.com/v2/chat", "key_env": "COHERE_API_KEY", "model": "command-r-plus", "name": "Cohere R+"}
-BRAINS["openrouter"] = {"url": "https://openrouter.ai/api/v1/chat/completions", "key_env": "OPENROUTER_API_KEY", "model": "deepseek/deepseek-chat-v3:free", "name": "DeepSeek v3"}
+BRAINS["openrouter"] = {"url": "https://openrouter.ai/api/v1/chat/completions", "key_env": "OPENROUTER_API_KEY", "model": "deepseek/deepseek-chat-v3-0324:free", "name": "DeepSeek v3"}
 BRAINS["cerebras"] = {"url": "https://api.cerebras.ai/v1/chat/completions", "key_env": "CEREBRAS_API_KEY", "model": "llama-3.3-70b", "name": "Cerebras Llama"}
-BRAINS["sambanova"] = {"url": "https://api.sambanova.ai/v1/chat/completions", "key_env": "SAMBANOVA_API_KEY", "model": "Meta-Llama-3.3-70B-Instruct", "name": "SambaNova Llama"}
+BRAINS["sambanova"] = {"url": "https://api.sambanova.ai/v1/chat/completions", "key_env": "SAMBANOVA_API_KEY", "model": "Meta-Llama-3.1-70B-Instruct", "name": "SambaNova Llama"}
 BRAINS["huggingface"] = {"url": "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2", "key_env": "HF_API_TOKEN", "name": "HuggingFace Mistral"}
 BRAINS["glyphic"] = {"url": "https://api.glyphic.ai/v1/chat/completions", "key_env": "GLYPHIC_API_KEY", "model": "glyphic-1", "name": "Glyphic-1"}
 
