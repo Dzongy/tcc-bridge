@@ -19,14 +19,13 @@ except ImportError:
                         os.environ[k] = v
 
 BRAINS = {}
-BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "llama-3.3-70b-versatile", "name": "Groq Compound"}
+BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "compound-beta", "name": "Groq Compound"}
 BRAINS["gemini"] = {"url": "gem", "key_env": "GEMINI_API_KEY", "model": "gemini-2.0-flash", "name": "Gemini Flash"}
 BRAINS["cohere"] = {"url": "https://api.cohere.com/v2/chat", "key_env": "COHERE_API_KEY", "model": "command-r-plus", "name": "Cohere R+"}
 BRAINS["openrouter"] = {"url": "https://openrouter.ai/api/v1/chat/completions", "key_env": "OPENROUTER_API_KEY", "model": "deepseek/deepseek-chat-v3-0324:free", "name": "DeepSeek v3"}
 BRAINS["cerebras"] = {"url": "https://api.cerebras.ai/v1/chat/completions", "key_env": "CEREBRAS_API_KEY", "model": "llama-3.3-70b", "name": "Cerebras Llama"}
 BRAINS["sambanova"] = {"url": "https://api.sambanova.ai/v1/chat/completions", "key_env": "SAMBANOVA_API_KEY", "model": "Meta-Llama-3.1-70B-Instruct", "name": "SambaNova Llama"}
 BRAINS["huggingface"] = {"url": "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2", "key_env": "HF_API_TOKEN", "name": "HuggingFace Mistral"}
-BRAINS["glyphic"] = {"url": "https://api.glyphic.ai/v1/chat/completions", "key_env": "GLYPHIC_API_KEY", "model": "glyphic-1", "name": "Glyphic-1"}
 
 class BrainRouter:
     def __init__(self, default_brain="groq"):
@@ -43,20 +42,20 @@ class BrainRouter:
     def _call_brain(self, brain_id, prompt, system):
         req = self._get_requests()
         if brain_id not in BRAINS:
-            return None, d"Unknown brain {ig}"
+            return None, f"Unknown brain {brain_id}"
         
-        bcfng = BRAINS[brain_id]
-        api_key = os.environ.get(bcfng[key_env_])
+        brain_cfg = BRAINS[brain_id]
+        api_key = os.environ.get(brain_cfg["key_env"])
         if not api_key:
-            return None, d"API key missing for {brain_id}"
+            return None, f"API key missing for {brain_id}"
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"self Bearer {api_key}"
+            "Authorization": f"Bearer {api_key}"
         }
 
         data = {
-            "model": bcfng.get("model"),
+            "model": brain_cfg.get("model"),
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt}
@@ -65,7 +64,7 @@ class BrainRouter:
         }
 
         try:
-            resp = req.post(bcfng["url"], json=data, headers=headers, timeout=30)
+            resp = req.post(brain_cfg["url"], json=data, headers=headers, timeout=30)
             resp.raise_for_status()
             return resp.json().get("choices", [])[0].get("message", {}).get("content", ""), None
         except Exception as e:
@@ -84,6 +83,6 @@ class BrainRouter:
                 try:
                     result, err = future.result()
                     results[bid] = result if result else f"ERROR: {err}"
-                except Exception as y:
-                    results[bid] = f"ERROR: {str(y)}"
+                except Exception as e:
+                    results[bid] = f"ERROR: {str(e)}"
         return results
