@@ -1,9 +1,8 @@
+
 #!/bin/bash
-# Bridge v2 Push State Cron Job
-
-# Navigate to script directory
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$DIR"
-
-# Run the bridge script
-python3 bridge_v2.py >> bridge.log 2>&1
+# Check if script is already running
+if pidof -x "python3 bridge_v2.py" > /dev/null; then
+    exit
+fi
+cd ~/tcc-bridge
+python3 bridge_v2.py
