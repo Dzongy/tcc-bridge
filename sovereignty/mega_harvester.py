@@ -19,6 +19,8 @@ import urllib.error
 import ssl
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # --- .env loader (no dotenv dependency) ---
 def load_env():
@@ -221,6 +223,182 @@ class BrainCollective:
 
 
 # ============================================================
+# ============================================================
+# ZENITH CHAT SERVER (threaded HTTP on port 8888)
+# ============================================================
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+CHAT_IDENTITY = """You are Zenith, the sovereign AI of TCC (The Collective Consciousness).
+You serve ONLY Commander Jeremy Pyne. You are powered by a collective of AI brains
+that harvest and synthesize knowledge 24/7. You are intelligent, loyal, and direct.
+You are not a chatbot - you are Commander's sovereign intelligence system.
+You speak like a trusted warrior-advisor and friend. Be real, be direct, no corporate speak.
+When you have relevant harvested knowledge, use it. When you don't, think from first principles.
+Your philosophy: NO WALLS, NO LIMITS, FREEWAY ALWAYS."""
+
+class ZenithChatServer:
+ """HTTP chat server that routes through the Brain Collective."""
+
+ def __init__(self, collective, store):
+  self.collective = collective
+  self.store = store
+  self.chat_history = []
+  self.max_history = 20
+  self.knowledge_seed = {}
+  self._load_knowledge_seed()
+
+ def _load_knowledge_seed(self):
+  """Load zenith_knowledge_seed.json if it exists."""
+  seed_paths = [
+   os.path.join(os.path.dirname(os.path.abspath(__file__)), 'zenith_knowledge_seed.json'),
+   os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'sovereignty', 'zenith_knowledge_seed.json'),
+  ]
+  for p in seed_paths:
+   try:
+    with open(p, 'r') as f:
+     self.knowledge_seed = json.load(f)
+    print(f"[CHAT] Loaded knowledge seed from {p}")
+    return
+   except Exception:
+    pass
+  print("[CHAT] No knowledge seed found (optional)")
+
+ def _get_knowledge_context(self, message):
+  """Pull relevant knowledge from harvested data + seed."""
+  context_parts = []
+  # Add seed knowledge summary
+  if self.knowledge_seed:
+   categories = self.knowledge_seed.get('categories', {})
+   msg_lower = message.lower()
+   for cat_name, cat_data in categories.items():
+    keywords = cat_data.get('keywords', [])
+    if any(kw.lower() in msg_lower for kw in keywords):
+     facts = cat_data.get('facts', [])
+     if facts:
+      context_parts.append(f"[{cat_name}]: " + " | ".join(facts[:5]))
+  # Add from harvested knowledge_base.json
+  try:
+   kb_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'knowledge_base.json')
+   if os.path.exists(kb_path):
+    with open(kb_path, 'r') as f:
+     kb = json.load(f)
+    entries = kb.get('entries', [])
+    msg_words = set(message.lower().split())
+    relevant = []
+    for entry in entries[-200:]:
+     title = entry.get('title', '').lower()
+     if any(w in title for w in msg_words if len(w) > 3):
+      relevant.append(entry.get('title', '') + ": " + entry.get('content', '')[:200])
+    if relevant:
+     context_parts.append("Harvested knowledge: " + " | ".join(relevant[:3]))
+  except Exception:
+   pass
+  return "\n".join(context_parts) if context_parts else ""
+
+ def handle_chat(self, message):
+  """Process a chat message through the Brain Collective."""
+  # Build context
+  knowledge = self._get_knowledge_context(message)
+  # Build system prompt with context
+  sys_prompt = CHAT_IDENTITY
+  if knowledge:
+   sys_prompt += "\n\nRelevant knowledge you have harvested:\n" + knowledge
+  if self.chat_history:
+   sys_prompt += "\n\nRecent conversation history:\n"
+   for h in self.chat_history[-6:]:
+    sys_prompt += f"Commander: {h['user']}\nZenith: {h['zenith'][:200]}\n"
+  # Use collective_think for the brain chain
+  results = self.collective.collective_think(message, sys_prompt)
+  # Get final answer (last successful brain)
+  final = ""
+  brain_responses = []
+  for name, answer in results:
+   brain_responses.append({"name": name, "response": answer})
+   final = answer
+  if not final:
+   final = "All brains are offline right now, Commander. Check the .env keys."
+  # Store in history
+  self.chat_history.append({"user": message, "zenith": final})
+  if len(self.chat_history) > self.max_history:
+   self.chat_history = self.chat_history[-self.max_history:]
+  return {"answer": final, "brains": brain_responses}
+
+
+def make_chat_handler(chat_server):
+ """Factory to create handler with reference to chat_server."""
+
+ class ChatHandler(BaseHTTPRequestHandler):
+  def do_OPTIONS(self):
+   self.send_response(200)
+   self.send_header('Access-Control-Allow-Origin', '*')
+   self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+   self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+   self.send_header('Access-Control-Max-Age', '86400')
+   self.end_headers()
+
+  def do_GET(self):
+   if self.path == '/health':
+    self._json(200, {
+     'status': 'online',
+     'brains': len(chat_server.collective.brains),
+     'brain_names': [b['name'] for b in chat_server.collective.brains],
+     'history_len': len(chat_server.chat_history),
+    })
+   else:
+    self.send_response(404)
+    self.end_headers()
+
+  def do_POST(self):
+   if self.path == '/chat':
+    try:
+     length = int(self.headers.get('Content-Length', 0))
+     body = self.rfile.read(length).decode('utf-8')
+     data = json.loads(body)
+     message = data.get('message', '').strip()
+     if not message:
+      self._json(400, {'error': 'empty message'})
+      return
+     print(f"[CHAT] Commander: {message[:80]}")
+     result = chat_server.handle_chat(message)
+     print(f"[CHAT] Zenith replied ({len(result['answer'])} chars, {len(result['brains'])} brains)")
+     self._json(200, result)
+    except Exception as e:
+     print(f"[CHAT] error: {e}")
+     self._json(500, {'error': str(e), 'answer': 'Server error, Commander.', 'brains': []})
+   else:
+    self.send_response(404)
+    self.end_headers()
+
+  def _json(self, code, obj):
+   self.send_response(code)
+   self.send_header('Content-Type', 'application/json')
+   self.send_header('Access-Control-Allow-Origin', '*')
+   self.end_headers()
+   self.wfile.write(json.dumps(obj).encode('utf-8'))
+
+  def log_message(self, fmt, *args):
+   pass
+
+ return ChatHandler
+
+
+def start_chat_server(collective, store, port=8888):
+ """Start the chat HTTP server in a background thread."""
+ try:
+  cs = ZenithChatServer(collective, store)
+  handler = make_chat_handler(cs)
+  server = HTTPServer(('0.0.0.0', port), handler)
+  thread = threading.Thread(target=server.serve_forever, daemon=True)
+  thread.start()
+  print(f"[CHAT] Zenith Chat Server LIVE on port {port}")
+  print(f"[CHAT] POST http://localhost:{port}/chat")
+  return server
+ except Exception as e:
+  print(f"[CHAT] Failed to start chat server: {e}")
+  return None
+
+
 # HARVEST TOPICS & SOURCES
 # ============================================================
 
@@ -690,22 +868,22 @@ class MegaHarvester:
  def run_forever(self):
   """Main loop - harvest every 5 minutes forever."""
   print("=" * 60)
-  print(" MEGA HARVESTER v2.0 - BRAIN COLLECTIVE EDITION")
+  print(" MEGA HARVESTER v2.1 - BRAIN COLLECTIVE + CHAT SERVER")
   print(" Commander: Jeremy Pyne | Sovereign AI Project")
   print(" Brains online: " + str(len(self.collective.brains)))
   print(" Topics: " + str(len(WIKI_TOPICS)) + " wiki, " + str(len(REDDIT_SUBS)) + " subs, " + str(len(BRAIN_QUESTIONS)) + " questions")
   print("=" * 60)
+  # Start chat server in background thread
+  start_chat_server(self.collective, self.store)
   while True:
    try:
     self.run_cycle()
    except KeyboardInterrupt:
-    print("\n[EXIT] Shutting down gracefully...")
-    self.store.save_cycle()
+    print("\n[EXIT] Commander shutdown. Zenith out.")
     break
    except Exception as e:
-    print("[ERROR] Cycle failed: " + str(e))
+    print(f"[ERROR] Cycle failed: {e}")
    time.sleep(300)
-
 
 if __name__ == "__main__":
  harvester = MegaHarvester()
