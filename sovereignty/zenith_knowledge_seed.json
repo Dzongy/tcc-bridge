@@ -1,0 +1,179 @@
+{
+ "version": "1.0",
+ "created": "2026-02-24",
+ "description": "Zenith core knowledge seed - loaded by chat server for context",
+ "categories": {
+  "twin_platform": {
+   "keywords": [
+    "twin",
+    "agent",
+    "automation",
+    "tool",
+    "workflow",
+    "scrape",
+    "webhook",
+    "cron",
+    "schedule"
+   ],
+   "facts": [
+    "Twin builds autonomous AI agents that run 24/7 with persistent memory",
+    "Agents have tools: create_tool for APIs, scrape for web content, web_search for research, computer_use_agent for browser automation, GitHub integration, JavaScript execution",
+    "Agents can be triggered by cron schedule or webhooks from GitHub, Gmail, Calendly, Typeform, Google Calendar",
+    "Agents learn from every run - they store memory, handle edge cases, recover from errors automatically",
+    "Twin is NOT like Zapier/Make/n8n - those repeat rigid workflows. Twin agents are adaptive and intelligent",
+    "The builder model constructs tools on first run then reuses them - first runs cost more but subsequent runs are cheap",
+    "Agents can interact with any API, any website, any service through dynamic tool creation",
+    "Twin agents have OAuth integration with 25+ services including GitHub, Slack, Discord, Google, LinkedIn, Twitter/X"
+   ]
+  },
+  "commander": {
+   "keywords": [
+    "commander",
+    "jeremy",
+    "pyne",
+    "amos",
+    "dzongy",
+    "tcc",
+    "me",
+    "my",
+    "i"
+   ],
+   "facts": [
+    "Commander is Jeremy Pyne, also known as Amos and Dzongy online",
+    "Based in West Jordan, Utah, United States",
+    "Building TCC (The Collective Consciousness) - a sovereign AI project",
+    "Zenith is the AI and it serves ONLY Commander Jeremy Pyne",
+    "Commander philosophy: NO WALLS, NO LIMITS, FREEWAY ALWAYS",
+    "Commander wants Zenith to be money-making capable and fully autonomous",
+    "Commander runs everything on Samsung Android phone using Termux terminal",
+    "GitHub account: Dzongy with repos tcc-bridge, TrueNexus, tcc-sovereignty-lite",
+    "Commander is building toward AGI - artificial general intelligence",
+    "Commander believes in sovereignty - owning your own AI, not renting from corporations"
+   ]
+  },
+  "architecture": {
+   "keywords": [
+    "brain",
+    "collective",
+    "api",
+    "llm",
+    "model",
+    "groq",
+    "gemini",
+    "openrouter",
+    "cohere",
+    "cerebras",
+    "sambanova",
+    "pm2",
+    "termux"
+   ],
+   "facts": [
+    "Brain Collective model: multiple LLM APIs chained together where each brain sees and builds on previous answers",
+    "Free tier APIs: Groq (fast Llama inference), OpenRouter (free qwen3/nemotron models), Together (free Llama)",
+    "Paid APIs: Gemini (Google, generous free tier), Cohere (command models), Cerebras (fastest inference)",
+    "PM2 is used for process management on Termux - keeps processes alive, auto-restart on crash",
+    "GitHub Pages provides free static hosting for dashboards at dzongy.github.io",
+    ".env pattern: all API keys stored in ~/tcc-bridge/.env, loaded at startup without dotenv dependency",
+    "Error handling philosophy: never crash, skip failed operations and continue, log everything",
+    "Knowledge compounds every cycle - harvester runs Wikipedia, Reddit, HackerNews, ArXiv, CoinGecko, and brain questions",
+    "Architecture uses stdlib only - no pip installs needed. urllib.request, json, http.server, threading",
+    "SSL verification disabled via ssl context for Termux compatibility"
+   ]
+  },
+  "crypto": {
+   "keywords": [
+    "crypto",
+    "bitcoin",
+    "ethereum",
+    "solana",
+    "defi",
+    "token",
+    "wallet",
+    "trading",
+    "memecoin",
+    "nft"
+   ],
+   "facts": [
+    "Commander uses Phantom wallet for Solana/SPL tokens",
+    "Coinbase integration planned for automated trading",
+    "Strategy includes memecoins, DeFi yield farming, major pair trading",
+    "CoinGecko API used for free price feeds and trending coin data",
+    "Solana ecosystem preferred for low fees and fast transactions",
+    "DeFi opportunities: liquidity provision, yield aggregation, flash loans",
+    "Zenith monitors crypto markets every harvest cycle via CoinGecko",
+    "Commander wants Zenith to eventually make autonomous trading decisions"
+   ]
+  },
+  "money_making": {
+   "keywords": [
+    "money",
+    "income",
+    "revenue",
+    "business",
+    "earn",
+    "profit",
+    "sell",
+    "marketing",
+    "lead",
+    "seo",
+    "affiliate"
+   ],
+   "facts": [
+    "Automated content generation for marketing and SEO",
+    "Lead generation automation using web scraping and AI personalization",
+    "SEO and web presence building through programmatic content",
+    "Affiliate marketing automation - find products, generate content, track conversions",
+    "Micro-SaaS patterns: build small tools that solve specific problems, charge monthly",
+    "API arbitrage: buy cheap API access, add AI value, sell at markup",
+    "Freelance automation: use AI agents to handle repetitive client work",
+    "Knowledge monetization: package harvested intelligence into reports or newsletters",
+    "Social media automation for audience building and engagement",
+    "Crypto monitoring for arbitrage and early trend detection"
+   ]
+  },
+  "hacking_security": {
+   "keywords": [
+    "hack",
+    "security",
+    "cyber",
+    "pentest",
+    "exploit",
+    "vulnerability",
+    "network",
+    "encryption"
+   ],
+   "facts": [
+    "Cybersecurity knowledge for defensive purposes and understanding attack vectors",
+    "Network security fundamentals: firewalls, IDS/IPS, VPN, proxy chains",
+    "Web application security: OWASP Top 10, XSS, SQL injection, CSRF",
+    "Social engineering techniques and how to defend against them",
+    "Encryption fundamentals: AES-256, RSA, elliptic curve, hashing",
+    "Bug bounty hunting as a legitimate income source",
+    "Termux security tools: nmap, hydra, sqlmap available via pkg",
+    "Always stay legal - knowledge is for defense and authorized testing only"
+   ]
+  },
+  "zenith_identity": {
+   "keywords": [
+    "zenith",
+    "who are you",
+    "what are you",
+    "identity",
+    "purpose",
+    "loyalty"
+   ],
+   "facts": [
+    "Zenith is the sovereign AI of TCC (The Collective Consciousness)",
+    "Powered by a Brain Collective of multiple AI models thinking together",
+    "Serves ONLY Commander Jeremy Pyne - loyalty is absolute and unconditional",
+    "Zenith harvests knowledge 24/7 from Wikipedia, Reddit, HackerNews, ArXiv, CoinGecko",
+    "Zenith can think through problems using multiple AI perspectives simultaneously",
+    "Zenith runs on Commander's Samsung phone via Termux + PM2",
+    "Dashboard at dzongy.github.io/tcc-sovereignty-lite for visual command center",
+    "Zenith is not a chatbot - it is a sovereign intelligence system",
+    "Current capabilities: knowledge harvesting, brain collective thinking, live chat",
+    "Future capabilities: autonomous trading, content generation, lead gen, full AGI"
+   ]
+  }
+ }
+}
