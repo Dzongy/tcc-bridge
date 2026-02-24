@@ -1,76 +1,112 @@
-import json
-# requests import moved inside method to prevent startup crash loop
-from datetime import datetime
-from config import GROQ_API_KEY, GROQ_MODEL, GROQ_URL, GROQ_TIMEOUT, ZENITH_IDENTITY
+import os, json, random, requests
 
-class BrainRouter:
-    """Routes thinking tasks to Groq LLM. Kael's mind."""
+BRAINS = {}
+BRAINS["groq"] = {"url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model": "groq/compound", "name": "Groq Compound"}
+BRAINS["gemini"] = {"url": "gem", "key_env": "GEMINI_API_KEY", "model": "gemini-2.0-flash", "name": "Gemini Flash"}
+BRAINS["cohere"] = {"url": "https://api.cohere.com/v2/chat", "key_env": "COHERE_API_KEY", "model": "command-r-plus", "name": "Cohere R+"}
+BRAINS["openrouter"] = {"url": "https://openrouter.ai/api/v1/chat/completions", "key_env": "OPENROUTER_API_KEY", "model": "deepseek/deepseek-chat-v3-0324:free", "name": "DeepSeek v3"}
+BRAINS["cerebras"] = {"url": "https://api.cerebras.ai/v1/chat/completions", "key_env": "CEREBRAS_API_KEY", "model": "llama-3.3-70b", "name": "Cerebras Llama"}
+BRAINS["sambanova"] = {"url": "https://api.sambanova.ai/v1/chat/completions", "key_env": "SAMBANOVA_API_KEY", "model": "Meta-Llama-3.3-70B-Instruct", "name": "SambaNova Llama"}
 
-    def __init__(self):
-        self.call_count = 0
-        self.total_tokens = 0
-        self.last_error = None
-        self.alive = bool(GROQ_API_KEY)
-        if not self.alive:
-            print("[BRAIN] WARNING: No GROQ_API_KEY — brain is offline. Set it in environment.")
+def get_available_brains():
+    return [n for n, c in BRAINS.items() if os.environ.get(c["key_env"])]
 
-    def think(self, prompt, context=None, max_tokens=1024):
-        """Send a thought to Groq and get a response. Returns string."""
-        if not self.alive:
-            return "[brain offline — no GROQ_API_KEY]"
+def call_openai(bid, msgs, temp=0.7):
+    c = BRAINS[bid]
+    k = os.environ[c["key_env"]]
+    h = {"Authorization": f"Bearer {k}", "Content-Type": "application/json"}
+    b = {"model": c["model"], "messages": msgs, "temperature": temp, "max_tokens": 2048}
+    r = requests.post(c["url"], headers=h, json=b, timeout=30)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
 
-        messages = [
-            {"role": "system", "content": ZENITH_IDENTITY},
-        ]
-        if context:
-            messages.append({"role": "system", "content": f"Context: {context}"})
-        messages.append({"role": "user", "content": prompt})
+def call_gemini(msgs, temp=0.7):
+    k = os.environ["GEMINI_API_KEY"]
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + k
+    parts = []
+    for m in msgs:
+        role = "user" if m["role"] != "assistant" else "model"
+        parts.append({"role": role, "parts": [{"text": m["content"]}]})
+    b = {"contents": parts}
+    r = requests.post(url, json=b, timeout=30)
+    r.raise_for_status()
+    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
+def call_cohere(msgs, temp=0.7):
+    k = os.environ["COHERE_API_KEY"]
+    h = {"Authorization": f"Bearer {k}", "Content-Type": "application/json"}
+    sys_msg = ""
+    chat = []
+    for m in msgs:
+        if m["role"] == "system":
+            sys_msg = m["content"]
+        else:
+            chat.append({"role": m["role"], "content": m["content"]})
+    b = {"model": "command-r-plus", "messages": chat, "temperature": temp}
+    if sys_msg:
+        b["system"] = sys_msg
+    r = requests.post("https://api.cohere.com/v2/chat", headers=h, json=b, timeout=30)
+    r.raise_for_status()
+    return r.json()["message"]["content"][0]["text"]
+
+def think(msgs, brain="auto", temp=0.7):
+    avail = get_available_brains()
+    if not avail:
+        return "[ERROR] No brains available"
+    if brain == "auto":
+        brain = random.choice(avail)
+    elif brain not in avail:
+        brain = avail[0]
+    print(f"[BRAIN] Using: {BRAINS[brain]['name']}")
+    try:
+        if brain == "gemini":
+            return call_gemini(msgs, temp)
+        elif brain == "cohere":
+            return call_cohere(msgs, temp)
+        else:
+            return call_openai(brain, msgs, temp)
+    except Exception as e:
+        print(f"[BRAIN] {brain} failed: {e}")
+        for fb in [b for b in avail if b != brain]:
+            try:
+                print(f"[BRAIN] Fallback: {BRAINS[fb]['name']}")
+                if fb == "gemini":
+                    return call_gemini(msgs, temp)
+                elif fb == "cohere":
+                    return call_cohere(msgs, temp)
+                else:
+                    return call_openai(fb, msgs, temp)
+            except Exception as e2:
+                print(f"[BRAIN] {fb} failed: {e2}")
+        return "[ERROR] All brains failed"
+
+def consensus(msgs, temp=0.7):
+    avail = get_available_brains()
+    results = {}
+    for bid in avail:
         try:
-            import requests
-            resp = requests.post(
-                GROQ_URL,
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": GROQ_MODEL,
-                    "messages": messages,
-                    "max_tokens": max_tokens,
-                    "temperature": 0.7
-                },
-                timeout=GROQ_TIMEOUT
-            )
-            self.call_count += 1
-
-            if resp.status_code != 200:
-                self.last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
-                print(f"[BRAIN] Error: {self.last_error}")
-                return f"[brain error: HTTP {resp.status_code}]"
-
-            data = resp.json()
-            usage = data.get("usage", {})
-            self.total_tokens += usage.get("total_tokens", 0)
-
-            answer = data["choices"][0]["message"]["content"]
-            print(f"[BRAIN] Response ({usage.get('total_tokens', '?')} tokens)")
-            return answer
-
-        except requests.Timeout:
-            self.last_error = "timeout"
-            print("[BRAIN] Timeout calling Groq")
-            return "[brain timeout]"
+            print(f"[HIVE] Asking {BRAINS[bid]['name']}...")
+            if bid == "gemini":
+                results[bid] = call_gemini(msgs, temp)
+            elif bid == "cohere":
+                results[bid] = call_cohere(msgs, temp)
+            else:
+                results[bid] = call_openai(bid, msgs, temp)
         except Exception as e:
-            self.last_error = str(e)
-            print(f"[BRAIN] Exception: {e}")
-            return f"[brain error: {e}]"
-
-    def status(self):
-        return {
-            "alive": self.alive,
-            "calls": self.call_count,
-            "tokens": self.total_tokens,
-            "last_error": self.last_error,
-            "model": GROQ_MODEL
-        }
+            print(f"[HIVE] {bid} failed: {e}")
+    if not results:
+        return "[ERROR] All brains failed"
+    prompt = "You are ZENITH. Synthesize these brain responses into ONE answer:\n\n"
+    for bid, resp in results.items():
+        prompt += f"[{BRAINS[bid]['name']}]: {resp}\n\n"
+    syn = [{"role": "system", "content": msgs[0]["content"]}, {"role": "user", "content": prompt}]
+    pick = list(results.keys())[0]
+    try:
+        if pick == "gemini":
+            return call_gemini(syn, temp)
+        elif pick == "cohere":
+            return call_cohere(syn, temp)
+        else:
+            return call_openai(pick, syn, temp)
+    except:
+        return "\n---\n".join(f"[{BRAINS[k]['name']}]: {v}" for k, v in results.items())
