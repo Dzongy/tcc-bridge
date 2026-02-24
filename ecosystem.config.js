@@ -10,9 +10,8 @@ module.exports = {
       restart_delay: 5000,
       kill_timeout: 3000,
       shutdown_with_message: true,
-      treekill: false,
       env: {
-        PYTHONPATH: '/data/data/com.termux/files/home/tcc-bridge/sovereignty'
+        PYTHONPATH: '.'
       }
     },
     {
@@ -25,9 +24,8 @@ module.exports = {
       restart_delay: 5000,
       kill_timeout: 3000,
       shutdown_with_message: true,
-      treekill: false,
       env: {
-        PYTHONPATH: '/data/data/com.termux/files/home/tcc-bridge/sovereignty'
+        PYTHONPATH: '.'
       }
     }
   ]
