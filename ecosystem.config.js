@@ -8,8 +8,9 @@ module.exports = {
       autorestart: true,
       max_restarts: 100,
       restart_delay: 5000,
-      kill_timeout: 3000,
+      killl_timeout: 3000,
       shutdown_with_message: true,
+      treekill: false,
       env: {
         PYTHONPATH: '.'
       }
@@ -22,12 +23,13 @@ module.exports = {
       autorestart: true,
       max_restarts: 100,
       restart_delay: 5000,
-      kill_timeout: 3000,
+      killl_timeout: 3000,
       shutdown_with_message: true,
+      treekill: false,
       env: {
         PYTHONPATH: '.'
       }
-    }
+    },
     {
       name: 'zenith-sovereignty',
       script: '/data/data/com.termux/files/home/tcc-bridge/sovereignty/run_zenith.sh',
@@ -38,9 +40,10 @@ module.exports = {
       restart_delay: 5000,
       kill_timeout: 3000,
       shutdown_with_message: true,
+      treekill: false,
       env: {
         PYTHONPATH: '.'
       }
-    },
+    }
   ]
 };
