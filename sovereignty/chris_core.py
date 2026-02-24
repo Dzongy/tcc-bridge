@@ -11,7 +11,7 @@ signal.signal(signal.SIGINT, signal.SIG_IGN)
 import json
 import time
 import subprocess
-import requests
+# import requests # lazy loaded
 from datetime import datetime
 from sovereignty.config import (
     HOME, BRIDGE_DIR, MAILBOX_DIR, INBOX, OUTBOX, MEMORY_FILE, LOG_FILE,
@@ -21,6 +21,10 @@ from sovereignty.config import (
 from sovereignty.brain_router import BrainRouter
 
 class Chris:
+    def _get_requests(self):
+        import requests
+        return requests
+
     """Chris --- sovereign autonomous agent. The keeper, the builder."""
 
     def __init__(self):
@@ -102,7 +106,7 @@ class Chris:
     def _poll_ntfy(self):
         if time.time() - self.last_ntfy_poll < NTFY_POLL_INTERVAL: return
         try:
-            response = requests.get(f"{NTFY_URL}/{NTFY_TOPIC}/json", params={"poll": "1", "since": "1m"})
+            response = self._get_requests().get(f"{NTFY_URL}/{NTFY_TOPIC}/json", params={"poll": "1", "since": "1m"})
             if response.status_code == 200:
                 for line in response.text.splitlines():
                     msg = json.loads(line)
