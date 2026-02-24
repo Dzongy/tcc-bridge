@@ -2,11 +2,12 @@ import signal
 import os
 import sys
 
-# Ignore SIGINT immediately to prevent PM2 crash loop
-signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-
-# Ignore SIGINT during startup to prevent PM2 crash loop
+# Ignore signals immediately to prevent PM2 crash loop
+for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    try:
+        signal.signal(sig, signal.SIG_IGN)
+    except (OSerror, ValueError):
+        pass
 
 import json
 import time
@@ -55,72 +56,49 @@ class Kael:
                 "learnings": []
             }
             with open(MEMORY_FILE, 'w') as f:
-                json.dump(mem, f, indent=2)
+                json.dump(mem, f, indent=4)
 
     def _log_event(self, event_type, data):
+        event = {
+            "timestamp": datetime.now().isoformat(),
+            "type": event_type,
+            "data": data
+        }
+        with open(LOG_FILE, 'a') as f:
+            f.write(json.dumps(event) + "\n")
+
+    def _write_outbox(self, message):
+        with open(OUTBOX, 'a') as f:
+            f.write(json.dumps(message) + "\n")
+
+    def health_check(self):
+        self._log_event("health_check", {"status": "present"})
+        return True
+
+    def poll_ntfy(self):
+        req = self._get_requests()
         try:
-            with open(MEMORY_FILE, 'r') as f:
-                mem = json.load(f)
-            mem["events"].append({
-                "timestamp": datetime.now().isoformat(),
-                "type": event_type,
-                "data": data
-            })
-            with open(MEMORY_FILE, 'w') as f:
-                json.dump(mem, f, indent=2)
-        except Exception as e:
-            print(f"[ERROR] Failed to log event: {e}")
-
-    def _read_inbox(self):
-        if not os.path.exists(INBOX): return []
-        try:
-            with open(INBOX, 'r') as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return []
-
-    def _write_outbox(self, data):
-        try:
-            outbox_data = []
-            if os.path.exists(OUTBOX):
-                with open(OUTBOX, 'r') as f:
-                    outbox_data = json.load(f)
-            data["timestamp"] = datetime.now().isoformat()
-            outbox_data.append(data)
-            with open(OUTBOX, 'w') as f:
-                json.dump(outbox_data, f, indent=2)
-        except Exception as e:
-            print(f"[ERROR] Failed to write outbox: {e}")
-
-    def _new_messages(self, messages):
-        for msg in messages:
-            print(f"[KAEL] INBOX MESSAGE: {msg}")
-            if "self-heal" in msg.lower():
-                self._heal()
-
-    def _heal(self):
-        print("[KAEL] Running self-heal protocol...")
-        self._log_event("heal", {"status": "success"})
-        self.last_heal = time.time()
-
-    def _poll_ntfy(self):
-        if time.time() - self.last_ntfy_poll < NTFY_POLL_INTERVAL: return
-        try:
-            response = self._get_requests().get(f"{NTFY_URL}/{NTFY_TOPIC}/json", params={"poll": "1", "since": "1m"})
-            if response.status_code == 200:
-                for line in response.text.splitlines():
-                    msg = json.loads(line)
-                    if msg["event"] == "message":
-                        self._new_messages([msg["message"]])
+            resp = req.get(f"{NTFY_URL}/{NTFY_TOPIC}/json", params={"poll": "1"}, timeout=10)
+            for line in resp.iter_lines():
+                if line:
+                    m = json.loads(line)
+                    if m.get("event") == "message":
+                        self._write_outbox({"msg": m.get("message"), "from": "commander"})
+                        print(f"[KAEL] New message from ntfy: {m.get('message')}")
         except Exception as e:
             print(f"[KAEL] ntfy poll error: {e}")
-        self.last_ntfy_poll = time.time()
 
     def run(self):
         while True:
-            self._poll_ntfy()
-            if time.time() - self.last_heal > HEAL_INTERVAL:
-                self._heal()
+            now = time.time()
+            if now - self.last_heal > HEAL_INTERVAL:
+                self.health_check()
+                self.last_heal = now
+            
+            if now - self.last_ntfy_poll > NTFY_POLL_INTERVAL:
+                self.poll_ntfy()
+                self.last_ntfy_poll = now
+            
             time.sleep(1)
 
 if __name__ == "__main__":
