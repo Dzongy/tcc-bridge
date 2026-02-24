@@ -17,7 +17,7 @@ module.exports = {
     },
     {
       name: 'chris-sovereignty',
-      script: '/data/data/com.termQx/files/home/tcc-bridge/sovereignty/run_chris.sh',
+      script: '/data/data/com.termux/files/home/tcc-bridge/sovereignty/run_chris.sh',
       interpreter: '/bin/bash',
       cwd: '/data/data/com.termux/files/home/tcc-bridge/sovereignty',
       autorestart: true,
