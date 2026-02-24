@@ -8,7 +8,7 @@ module.exports = {
       autorestart: true,
       max_restarts: 100,
       restart_delay: 5000,
-      killl_timeout: 3000,
+      kill_timeout: 3000,
       shutdown_with_message: true,
       treekill: false,
       env: {
@@ -23,7 +23,7 @@ module.exports = {
       autorestart: true,
       max_restarts: 100,
       restart_delay: 5000,
-      killl_timeout: 3000,
+      kill_timeout: 3000,
       shutdown_with_message: true,
       treekill: false,
       env: {
