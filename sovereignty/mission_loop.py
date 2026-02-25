@@ -37,7 +37,7 @@ except ImportError:
 def http_post(url, data):
     """POST JSON data, return parsed response"""
     payload = json.dumps(data).encode("utf-8")
-    req = Request(url, data=payload, headers={"Content-Type": "application/json"})
+    req = Request(url, data=payload, headers={"Content-Type": "application/json", "User-Agent": "TCC-Sniper/3.0"})
     try:
         with urlopen(req, timeout=30) as resp:
             return json.loads(resp.read().decode())
@@ -47,7 +47,7 @@ def http_post(url, data):
 
 def http_get(url):
     """GET request, return parsed JSON"""
-    req = Request(url)
+    req = Request(url, headers={"User-Agent": "TCC-Sniper/3.0"})
     try:
         with urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode())
