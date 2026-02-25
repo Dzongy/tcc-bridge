@@ -162,8 +162,8 @@ var waveInt=null;
 function startWave(mode){waveVis.className='wave-vis '+(mode||'');stopWave();waveInt=setInterval(function(){waveBars.forEach(function(bar){bar.style.transform='scaleY('+(0.2+Math.random()*0.8)+')';});},80);}
 function stopWave(){if(waveInt)clearInterval(waveInt);waveInt=null;waveBars.forEach(function(bar){bar.style.transform='scaleY(0.3)';});waveVis.className='wave-vis';}
 function speakReply(text){if(!synth)return;synth.cancel();isSpeaking=true;micBtn.className='mic-btn speaking';voiceStatus.textContent='ZENITH SPEAKING';voiceStatus.className='voice-status speaking';startWave('speaking');
-var u=new SpeechSynthesisUtterance(text);u.rate=1.0;u.pitch=0.85;u.volume=1.0;
-var voices=synth.getVoices();for(var i=0;i<voices.length;i++){var vn=voices[i].name.toLowerCase();if(vn.indexOf('male')>-1||vn.indexOf('daniel')>-1||vn.indexOf('james')>-1||vn.indexOf('google uk english male')>-1){u.voice=voices[i];break;}}
+var u=new SpeechSynthesisUtterance(text);u.rate=0.9;u.pitch=0.8;u.volume=1.0;
+var voices=synth.getVoices();var bestVoice=null;var bestScore=0;for(var i=0;i<voices.length;i++){var vn=voices[i].name.toLowerCase();var score=0;if(vn.indexOf('male')>-1)score+=3;if(vn.indexOf('david')>-1)score+=5;if(vn.indexOf('james')>-1)score+=5;if(vn.indexOf('daniel')>-1)score+=4;if(vn.indexOf('english')>-1)score+=2;if(vn.indexOf('google uk english male')>-1)score+=6;if(score>bestScore){bestScore=score;bestVoice=voices[i];}}if(bestVoice)u.voice=bestVoice;
 u.onend=function(){isSpeaking=false;micBtn.className='mic-btn';voiceStatus.textContent='TAP TO SPEAK';voiceStatus.className='voice-status';stopWave();};
 u.onerror=function(){isSpeaking=false;micBtn.className='mic-btn';voiceStatus.textContent='TAP TO SPEAK';voiceStatus.className='voice-status';stopWave();};
 synth.speak(u);}
