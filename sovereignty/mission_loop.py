@@ -124,7 +124,10 @@ def log_trade(action, token, amount, confidence, result="pending"):
 def get_balance_safe():
     if TRADING_LIVE:
         try:
-            return get_sol_balance()
+            result = get_sol_balance()
+            if isinstance(result, dict) and 'sol' in result:
+                return result['sol']
+            return float(result) if result else -1
         except Exception:
             return -1
     return -1
